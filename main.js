@@ -327,6 +327,13 @@ function renderBase() {
   const depthRow = el('div', 'depth-row');
   depthRow.innerHTML = `<span>往下挖地瓜</span><span id="status-text"></span>`;
 
+  const autoDigWrap = el('div', 'autodig-wrap');
+  autoDigWrap.innerHTML = `
+    <div class="autodig-label" id="autodig-label">自動挖</div>
+    <div class="autodig-track"><div class="autodig-fill" id="autodig-fill"></div></div>
+    <div class="autodig-time" id="autodig-time">0.0s</div>
+  `;
+
   const tiles = el('div', 'tiles');
   const colL = el('div', 'tile-column');
   const colR = el('div', 'tile-column');
@@ -356,11 +363,16 @@ function renderBase() {
 
   digArea.appendChild(scene);
   digArea.appendChild(depthRow);
+  digArea.appendChild(autoDigWrap);
   digArea.appendChild(tiles);
 
   const inputOverlay = el('div', 'input-overlay');
   const halfL = el('div', 'input-half input-half-left');
   const halfR = el('div', 'input-half input-half-right');
+  const hintL = el('div', 'touch-hint', '左側挖掘');
+  const hintR = el('div', 'touch-hint', '右側挖掘');
+  halfL.appendChild(hintL);
+  halfR.appendChild(hintR);
   halfL.addEventListener('click', () => dig('left'));
   halfR.addEventListener('click', () => dig('right'));
   inputOverlay.appendChild(halfL);
@@ -408,7 +420,17 @@ function updateHUD() {
   if (depthEl) depthEl.textContent = state.depth;
   if (toolEl) toolEl.textContent = state.tools;
   if (bestEl) bestEl.textContent = state.bestDepth;
-  if (statusEl) statusEl.textContent = state.alive ? '' : '工具壞掉了';
+  if (statusEl) {
+    if (!state.alive) {
+      statusEl.textContent = '工具壞掉了';
+    } else if (state.paused) {
+      statusEl.textContent = '已暫停';
+    } else if (state.autoDigActive) {
+      statusEl.textContent = `自動挖掘（${state.autoDigSide === 'left' ? '左' : '右'}）`;
+    } else {
+      statusEl.textContent = '';
+    }
+  }
 
   // 視覺化數值
   if (depthMeter) {
@@ -428,6 +450,26 @@ function updateHUD() {
   const pauseBtn = document.getElementById('pause-btn');
   if (pauseBtn) {
     pauseBtn.textContent = state.paused ? '繼續' : '暫停';
+  }
+
+  const autoDigLabel = document.getElementById('autodig-label');
+  const autoDigFill = document.getElementById('autodig-fill');
+  const autoDigTime = document.getElementById('autodig-time');
+  if (autoDigLabel && autoDigFill && autoDigTime) {
+    if (state.autoDigActive) {
+      const totalMs = 5000;
+      const remain = Math.max(0, state.autoDigRemainingMs || 0);
+      const ratio = Math.max(0, Math.min(1, remain / totalMs));
+      autoDigLabel.textContent = '自動挖';
+      autoDigFill.style.width = `${ratio * 100}%`;
+      autoDigTime.textContent = `${(remain / 1000).toFixed(1)}s`;
+      autoDigFill.classList.add('active');
+    } else {
+      autoDigLabel.textContent = state.paused ? '已暫停' : '自動挖';
+      autoDigFill.style.width = '0%';
+      autoDigTime.textContent = '0.0s';
+      autoDigFill.classList.remove('active');
+    }
   }
 
   // 挖到石頭時顯示耐久度降低提示

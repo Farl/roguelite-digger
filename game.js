@@ -491,6 +491,10 @@ export class Game {
   }
 
   getState() {
+    const autoDigRemainingMs = this.autoDigActive
+      ? Math.max(0, Math.ceil(this.autoDigEndAt - performance.now()))
+      : 0;
+
     return {
       depth: this.depth,
       tools: this.tools,
@@ -502,6 +506,7 @@ export class Game {
       maxTools: this.maxTools,
       autoDigActive: this.autoDigActive,
       autoDigSide: this.autoDigSide,
+      autoDigRemainingMs,
       lastHit: this.lastHit,
       lastPuzzlePiece: this.lastPuzzlePiece,
       goldPlatingActive: this.goldPlatingActive

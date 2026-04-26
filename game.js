@@ -43,6 +43,11 @@ export class Game {
     this.autoDigEndAt = 0;
     this.autoStonePunish = false;
 
+    // 互動穩定性：暫停旗標與步進節流，避免短時間連擊造成狀態錯位
+    this.paused = false;
+    this.lastStepAt = 0;
+    this.minStepIntervalMs = 90;
+
     this.startRun();
   }
 
@@ -67,6 +72,8 @@ export class Game {
     this.alive = true;
     this.biasSoft = 0;
     this.inEvent = false;
+    this.paused = false;
+    this.lastStepAt = 0;
     this.lastEventRowDepthGenerated = -999;
     this.lastPuzzlePiece = null;
     this.goldPlatingActive = false;
@@ -109,7 +116,11 @@ export class Game {
   }
 
   step(side) {
-    if (!this.alive || this.inEvent) return;
+    if (!this.alive || this.inEvent || this.paused) return;
+
+    const now = performance.now();
+    if (now - this.lastStepAt < this.minStepIntervalMs) return;
+    this.lastStepAt = now;
 
     this.lastSide = side;
 
@@ -187,6 +198,7 @@ export class Game {
   handleEventTile() {
     // 進入事件時先清除舊的自動挖狀態，避免效果疊加出問題
     this.stopAutoDig();
+    this.paused = false;
     this.inEvent = true;
     const eventData = this.makeEvent();
     this.onEvent(eventData, choice => {
@@ -412,11 +424,25 @@ export class Game {
   applyEvent(option) {
     option.apply();
     this.inEvent = false;
+    this.paused = false;
+  }
+
+  setPaused(paused) {
+    if (!this.alive || this.inEvent) return;
+    this.paused = Boolean(paused);
+    if (this.paused) {
+      this.stopAutoDig();
+    }
+    this.onUpdate(this.getState());
+  }
+
+  togglePause() {
+    this.setPaused(!this.paused);
   }
 
   startAutoDig(side, durationMs = 5000, intervalMs = 250, punish = true) {
     this.stopAutoDig();
-    if (!this.alive) return;
+    if (!this.alive || this.paused || this.inEvent) return;
 
     this.autoDigActive = true;
     this.autoDigSide = side;
@@ -424,7 +450,7 @@ export class Game {
     this.autoDigEndAt = performance.now() + durationMs;
 
     const tick = () => {
-      if (!this.autoDigActive || !this.alive || this.inEvent) return;
+      if (!this.autoDigActive || !this.alive || this.inEvent || this.paused) return;
       const now = performance.now();
       if (now >= this.autoDigEndAt) {
         this.stopAutoDig();
@@ -472,6 +498,7 @@ export class Game {
       previews: this.previews,
       bestDepth: this.meta.bestDepth,
       inEvent: this.inEvent,
+      paused: this.paused,
       maxTools: this.maxTools,
       autoDigActive: this.autoDigActive,
       autoDigSide: this.autoDigSide,

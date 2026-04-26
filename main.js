@@ -32,7 +32,7 @@ function moveWorkerToSide(side) {
 }
 
 function dig(side) {
-  if (!game || !state || !state.alive || state.inEvent) return;
+  if (!game || !state || !state.alive || state.inEvent || state.paused) return;
 
   // 自動挖掘期間，點擊只會改變方向，不會額外手動挖
   if (state.autoDigActive) {
@@ -281,6 +281,12 @@ function renderBase() {
   const surfaceLeft = el('div', null, '地面');
   surfaceLeft.id = 'surface-info';
   const surfaceRight = el('div');
+  const pauseBtn = el('button', null, '暫停');
+  pauseBtn.id = 'pause-btn';
+  pauseBtn.onclick = () => {
+    if (!game || !state || !state.alive || state.inEvent) return;
+    game.togglePause();
+  };
   const resetBtn = el('button', null, '重新開始');
   resetBtn.onclick = () => game.startRun();
   const puzzleBtn = el('button', null, '拼圖');
@@ -294,6 +300,7 @@ function renderBase() {
       lastPuzzleCount = null;
     }
   };
+  surfaceRight.appendChild(pauseBtn);
   surfaceRight.appendChild(puzzleBtn);
   surfaceRight.appendChild(resetBtn);
   surfaceRight.appendChild(clearBtn);
@@ -416,6 +423,11 @@ function updateHUD() {
     const maxTools = state.maxTools || state.tools || 1;
     const pct = Math.min(state.tools / maxTools, 1) * 100;
     toolMeter.style.width = `${pct}%`;
+  }
+
+  const pauseBtn = document.getElementById('pause-btn');
+  if (pauseBtn) {
+    pauseBtn.textContent = state.paused ? '繼續' : '暫停';
   }
 
   // 挖到石頭時顯示耐久度降低提示
@@ -679,13 +691,28 @@ function showGameOverModal(onRestart) {
 
 function addKeyboardControls() {
   window.addEventListener('keydown', (e) => {
-    if (!state || !state.alive || state.inEvent) return;
-    if (e.key === 'ArrowLeft') {
+    if (!state || !state.alive) return;
+
+    const key = e.key.toLowerCase();
+    if (key === 'p' || e.key === 'Escape') {
+      e.preventDefault();
+      if (!state.inEvent && game) game.togglePause();
+      return;
+    }
+
+    if (state.inEvent || state.paused) return;
+
+    if (e.key === 'ArrowLeft' || key === 'a' || e.key === '1') {
       e.preventDefault();
       dig('left');
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowRight' || key === 'd' || e.key === '2') {
       e.preventDefault();
       dig('right');
+    } else if (key === 'w' || key === 's' || e.key === ' ') {
+      e.preventDefault();
+      // 讓單鍵玩家可快速沿著上一個方向繼續挖
+      const side = state.autoDigSide || 'left';
+      dig(side);
     }
   });
 }

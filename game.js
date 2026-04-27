@@ -48,6 +48,7 @@ export class Game {
     this.lastStepAt = 0;
     this.minStepIntervalMs = 90;
 
+    this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
     this.startRun();
   }
 
@@ -81,6 +82,8 @@ export class Game {
     // 重置快速挖掘狀態
     this.stopAutoDig();
     this.lastSide = 'left';
+
+    this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
 
     this.previews = this.generatePreviews();
     this.onUpdate(this.getState());
@@ -169,6 +172,8 @@ export class Game {
 
     // 基礎傷害：鑽石比石頭更痛
     let dmg = tile === TILE_TYPES.DIAMOND ? 2 : 1;
+    if (tile === TILE_TYPES.STONE) this.stats.stonesHit++;
+    if (tile === TILE_TYPES.DIAMOND) this.stats.diamondsHit++;
 
     // 快速挖掘的危險：自動挖時提高傷害
     if (this.autoDigActive && this.autoStonePunish) {
@@ -196,6 +201,7 @@ export class Game {
    * 處理事件格（彈出事件 UI）
    */
   handleEventTile() {
+    this.stats.eventsTriggered++;
     // 進入事件時先清除舊的自動挖狀態，避免效果疊加出問題
     this.stopAutoDig();
     this.paused = false;
@@ -545,7 +551,8 @@ export class Game {
       autoDigRemainingMs,
       lastHit: this.lastHit,
       lastPuzzlePiece: this.lastPuzzlePiece,
-      goldPlatingActive: this.goldPlatingActive
+      goldPlatingActive: this.goldPlatingActive,
+      stats: { ...this.stats }
     };
   }
 }

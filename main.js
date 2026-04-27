@@ -536,6 +536,15 @@ function updateHUD() {
     const maxTools = state.maxTools || state.tools || 1;
     const pct = Math.min(state.tools / maxTools, 1) * 100;
     toolMeter.style.width = `${pct}%`;
+    // color: green > 60%, yellow 30-60%, red < 30%
+    const ratio = state.tools / maxTools;
+    if (ratio > 0.6) {
+      toolMeter.style.background = 'linear-gradient(90deg,#52d48a,#7eedb5)';
+    } else if (ratio > 0.3) {
+      toolMeter.style.background = 'linear-gradient(90deg,#f6cf4a,#ffe58a)';
+    } else {
+      toolMeter.style.background = 'linear-gradient(90deg,#e05050,#ff8080)';
+    }
   }
 
   const pauseBtn = document.getElementById('pause-btn');
@@ -857,6 +866,16 @@ function showGameOverModal(onRestart) {
   const prev = meta && meta.bestDepth > 0 ? el('div', 'center-text', `上次最佳：${meta.bestDepth}`) : null;
   if (prev) prev.style.opacity = '0.65';
 
+  // run stats
+  const statsEl = el('div', 'center-text');
+  statsEl.style.fontSize = '11px';
+  statsEl.style.opacity = '0.72';
+  statsEl.style.marginTop = '2px';
+  if (state.stats) {
+    const { stonesHit, diamondsHit, eventsTriggered } = state.stats;
+    statsEl.textContent = `🪨 ${stonesHit}　💎 ${diamondsHit}　❓ ${eventsTriggered}`;
+  }
+
   const row = el('div', 'modal-footer');
   const btn = el('button', 'btn-primary', '回到地面');
   btn.onclick = () => {
@@ -867,6 +886,7 @@ function showGameOverModal(onRestart) {
   modal.appendChild(title);
   modal.appendChild(txt);
   if (prev) modal.appendChild(prev);
+  modal.appendChild(statsEl);
   modal.appendChild(row);
   backdrop.appendChild(modal);
   modalRoot.appendChild(backdrop);

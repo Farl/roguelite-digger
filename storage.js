@@ -62,3 +62,11 @@ export function loadMute() {
 export function saveMute(muted) {
   try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch {}
 }
+
+const HINT_KEY = 'yam_roguelite_hint_dismissed_v1';
+export function loadHintDismissed() {
+  return localStorage.getItem(HINT_KEY) === '1';
+}
+export function saveHintDismissed() {
+  try { localStorage.setItem(HINT_KEY, '1'); } catch {}
+}

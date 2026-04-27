@@ -587,6 +587,72 @@
     }
     #mute-btn:hover { background:rgba(0,0,0,0.35); }
     #mute-btn.muted { opacity:.5; }
+    /* hint bar for first run */
+    .hint-bar {
+      position:absolute;
+      bottom:44px;
+      left:8px;
+      right:8px;
+      border-radius:var(--radius-sm);
+      background:rgba(0,0,0,0.68);
+      color:rgba(255,240,200,0.92);
+      font-size:11px;
+      padding:6px 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      z-index:30;
+      backdrop-filter:blur(2px);
+      border:1px solid rgba(255,255,255,0.14);
+    }
+    .hint-bar-text { flex:1; line-height:1.4; }
+    .hint-bar-close {
+      border:none;
+      background:rgba(255,255,255,0.15);
+      color:rgba(255,240,200,0.9);
+      border-radius:var(--radius-pill);
+      padding:2px 8px;
+      font-size:11px;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    /* keyboard shortcuts list in modal */
+    .shortcut-list {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      font-size:12px;
+    }
+    .shortcut-row {
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .shortcut-key {
+      min-width:32px;
+      text-align:center;
+      border-radius:4px;
+      background:rgba(0,0,0,0.12);
+      border:1px solid rgba(0,0,0,0.22);
+      padding:1px 5px;
+      font-family:monospace;
+      font-size:11px;
+      font-weight:600;
+    }
+    /* help button */
+    #help-btn {
+      border:none;
+      background:rgba(0,0,0,0.18);
+      color:var(--c-text);
+      border-radius:var(--radius-pill);
+      padding:3px 9px;
+      font-size:13px;
+      cursor:pointer;
+      line-height:1;
+      box-shadow:0 1px 2px rgba(0,0,0,0.3);
+    }
+
     /* milestone celebration toast */
     .milestone-toast {
       position:absolute;

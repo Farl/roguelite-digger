@@ -1,5 +1,5 @@
 import { Game } from './game.js';
-import { loadMute, saveMute } from './storage.js';
+import { loadMute, saveMute, loadHintDismissed, saveHintDismissed } from './storage.js';
 
 const app = document.getElementById('app');
 
@@ -261,6 +261,39 @@ function showCollectionModal() {
   modalRoot.appendChild(backdrop);
 }
 
+function showHelpModal() {
+  if (!modalRoot) return;
+  modalRoot.innerHTML = '';
+  const backdrop = el('div', 'modal-backdrop');
+  backdrop.style.pointerEvents = 'auto';
+  const modal = el('div', 'modal');
+  const title = el('div', 'modal-title', '鍵盤操作');
+  const list = el('div', 'shortcut-list');
+  const shortcuts = [
+    ['A / ←', '挖左側'],
+    ['D / →', '挖右側'],
+    ['W/S/空格', '沿上次方向挖'],
+    ['1', '挖左側'],
+    ['2', '挖右側'],
+    ['P / Esc', '暫停 / 繼續'],
+  ];
+  for (const [k, v] of shortcuts) {
+    const row = el('div', 'shortcut-row');
+    row.appendChild(el('span', 'shortcut-key', k));
+    row.appendChild(el('span', null, v));
+    list.appendChild(row);
+  }
+  const footer = el('div', 'modal-footer');
+  const closeBtn = el('button', 'btn-primary', '關閉');
+  closeBtn.onclick = () => { modalRoot.innerHTML = ''; };
+  footer.appendChild(closeBtn);
+  modal.appendChild(title);
+  modal.appendChild(list);
+  modal.appendChild(footer);
+  backdrop.appendChild(modal);
+  modalRoot.appendChild(backdrop);
+}
+
 function renderBase() {
   app.innerHTML = '';
   app.style.position = 'relative';
@@ -334,8 +367,13 @@ function renderBase() {
       lastPuzzleCount = null;
     }
   };
+  const helpBtn = el('button', null, '？');
+  helpBtn.id = 'help-btn';
+  helpBtn.onclick = () => showHelpModal();
+
   surfaceRight.appendChild(pauseBtn);
   surfaceRight.appendChild(muteBtn);
+  surfaceRight.appendChild(helpBtn);
   surfaceRight.appendChild(puzzleBtn);
   surfaceRight.appendChild(resetBtn);
   surfaceRight.appendChild(clearBtn);
@@ -416,6 +454,21 @@ function renderBase() {
   inputOverlay.appendChild(halfL);
   inputOverlay.appendChild(halfR);
   digArea.appendChild(inputOverlay);
+
+  // first-run hint bar
+  if (!loadHintDismissed()) {
+    const hintBar = el('div', 'hint-bar');
+    hintBar.id = 'hint-bar';
+    const hintText = el('div', 'hint-bar-text', '點左半邊挖左、右半邊挖右。鍵盤：A/←挖左，D/→挖右，P暫停。');
+    const hintClose = el('button', 'hint-bar-close', '知道了');
+    hintClose.onclick = () => {
+      saveHintDismissed();
+      hintBar.remove();
+    };
+    hintBar.appendChild(hintText);
+    hintBar.appendChild(hintClose);
+    digArea.appendChild(hintBar);
+  }
 
   main.appendChild(surface);
   main.appendChild(digArea);

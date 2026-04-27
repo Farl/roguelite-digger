@@ -280,19 +280,24 @@ export class Game {
     }
 
     const useSoft = this.biasSoft > 0;
+    // 深度越深，石頭機率提高（每 10 層 +2%，上限 +20%）
+    const depthBonus = Math.min(0.20, Math.floor(rowDepth / 10) * 0.02);
 
     const randomTileBase = () => {
       const r = Math.random();
       if (useSoft) {
         // 軟一點的分佈：石頭與鑽石機率稍微降低
-        if (r < 0.58) return TILE_TYPES.DIRT;
+        if (r < 0.60) return TILE_TYPES.DIRT;
         if (r < 0.78) return TILE_TYPES.STONE;
         if (r < 0.83) return TILE_TYPES.DIAMOND;
         return TILE_TYPES.EVENT;
       } else {
-        if (r < 0.50) return TILE_TYPES.DIRT;
-        if (r < 0.75) return TILE_TYPES.STONE;
-        if (r < 0.82) return TILE_TYPES.DIAMOND;
+        const stoneThresh = 0.50 - depthBonus;
+        const diamondThresh = stoneThresh + 0.25 + depthBonus * 0.5;
+        const eventThresh = diamondThresh + 0.07;
+        if (r < stoneThresh) return TILE_TYPES.DIRT;
+        if (r < diamondThresh) return TILE_TYPES.STONE;
+        if (r < eventThresh) return TILE_TYPES.DIAMOND;
         return TILE_TYPES.EVENT;
       }
     };
@@ -364,6 +369,23 @@ export class Game {
       }
     ];
 
+    // 深度 > 20 時，追加一個更強的選項
+    if (this.depth > 20) {
+      choiceOptions.push({
+        id: 'breath_deep',
+        title: '深吸一口氣',
+        desc: '接下來 12 格大幅降低危險，+1 耐久',
+        apply: () => {
+          this.tools += 1;
+          this.maxTools = Math.max(this.maxTools, this.tools);
+          this.biasSoft = 12;
+        }
+      });
+    }
+
+    // 從 choice 池隨機抽 3 個
+    const shuffleChoice = [...choiceOptions].sort(() => Math.random() - 0.5).slice(0, 3);
+
     const rouletteOptions = [
       {
         id: 'big_tool',
@@ -394,10 +416,24 @@ export class Game {
         title: '地心衝刺',
         desc: '自動往同一側挖 5 秒，石頭更多也更痛',
         apply: () => {
-          // 先從目前方向開始，玩家仍可改變方向
           const side = this.lastSide || 'left';
           this.startAutoDig(side, 5000, 220, true);
         }
+      },
+      {
+        id: 'gift_box',
+        title: '地瓜大禮包',
+        desc: '+3 本場工具耐久！（稀有）',
+        apply: () => {
+          this.tools += 3;
+          this.maxTools = Math.max(this.maxTools, this.tools);
+        }
+      },
+      {
+        id: 'golden_guard_r',
+        title: '鍍金護盾',
+        desc: '下一次石頭或鑽石傷害無效',
+        apply: () => { this.goldPlatingActive = true; }
       }
     ];
 
@@ -417,7 +453,7 @@ export class Game {
       mode: 'choice',
       title: '地底抉擇',
       desc: '從三個效果中挑選一個。',
-      options: choiceOptions
+      options: shuffleChoice
     };
   }
 

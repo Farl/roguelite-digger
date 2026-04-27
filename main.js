@@ -541,6 +541,21 @@ function updateHUD() {
     }
   }
 
+  // gold plating indicator
+  const toolValEl2 = document.getElementById('tool-val');
+  if (toolValEl2) {
+    const badge2 = toolValEl2.closest('.badge');
+    if (badge2) {
+      if (state.goldPlatingActive) {
+        badge2.style.boxShadow = '0 0 8px 3px rgba(255,230,80,0.75)';
+        badge2.title = '鍍金護盾：下一次石頭/鑽石傷害無效';
+      } else {
+        badge2.style.boxShadow = '';
+        badge2.title = '';
+      }
+    }
+  }
+
   updateToolIndicator();
 }
 

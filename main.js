@@ -1,4 +1,5 @@
 import { Game } from './game.js';
+import { loadMute, saveMute } from './storage.js';
 
 const app = document.getElementById('app');
 
@@ -18,6 +19,7 @@ let modalRoot = null;
 let toolIndicatorTimer = null;
 let durabilityPopupTimer = null;
 let lastPuzzleCount = null;
+let muted = false;
 
 function triggerScrollAnimation() {
   // 動畫移除：保留函式但不做任何事
@@ -45,6 +47,15 @@ function dig(side) {
   moveWorkerToSide(side);
   triggerScrollAnimation();
   game.step(side);
+
+  // digBounce animation on worker-tool
+  const wt = document.querySelector('.worker-tool');
+  if (wt) {
+    wt.classList.remove('bouncing');
+    void wt.offsetWidth; // reflow to restart
+    wt.classList.add('bouncing');
+    wt.addEventListener('animationend', () => wt.classList.remove('bouncing'), { once: true });
+  }
 
   // 手動挖時，短暫顯示工具位置（已整合到小工人移動，保留函式以避免錯誤）
   showToolIndicatorOnce(side);
@@ -287,6 +298,15 @@ function renderBase() {
     if (!game || !state || !state.alive || state.inEvent) return;
     game.togglePause();
   };
+  const muteBtn = el('button', null, muted ? '🔇' : '🔊');
+  muteBtn.id = 'mute-btn';
+  if (muted) muteBtn.classList.add('muted');
+  muteBtn.onclick = () => {
+    muted = !muted;
+    saveMute(muted);
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('muted', muted);
+  };
   const resetBtn = el('button', null, '重新開始');
   resetBtn.onclick = () => game.startRun();
   const puzzleBtn = el('button', null, '拼圖');
@@ -301,6 +321,7 @@ function renderBase() {
     }
   };
   surfaceRight.appendChild(pauseBtn);
+  surfaceRight.appendChild(muteBtn);
   surfaceRight.appendChild(puzzleBtn);
   surfaceRight.appendChild(resetBtn);
   surfaceRight.appendChild(clearBtn);
@@ -309,6 +330,9 @@ function renderBase() {
 
   const digArea = el('div', 'dig-area');
   digArea.id = 'dig-area';
+  const hitFlash = el('div', 'hit-flash');
+  hitFlash.id = 'hit-flash';
+  digArea.appendChild(hitFlash);
 
   const scene = el('div', 'scene');
   const worker = el('div', 'worker worker-left');
@@ -479,6 +503,28 @@ function updateHUD() {
     (!prevState || !prevState.lastHit || state.lastHit.time !== prevState.lastHit.time)
   ) {
     showDurabilityPopup(state.lastHit.dmg);
+    // hit flash
+    const flash = document.getElementById('hit-flash');
+    if (flash) {
+      flash.classList.remove('active');
+      void flash.offsetWidth;
+      flash.classList.add('active');
+    }
+  }
+
+  // danger badge on tools badge
+  const toolBadge = document.querySelector('.badge:nth-child(1)');
+  // find tool badge by id of inner element
+  const toolValEl = document.getElementById('tool-val');
+  if (toolValEl) {
+    const badge = toolValEl.closest('.badge');
+    if (badge) {
+      if (state.alive && state.tools <= 2) {
+        badge.classList.add('danger');
+      } else {
+        badge.classList.remove('danger');
+      }
+    }
   }
 
   updateToolIndicator();
@@ -562,19 +608,23 @@ function renderTiles() {
       const t = tiles[i];
       s.className = 'tile-slot';
       s.title = '';
-      let label = '';
-      if (t === 'dirt') { label = ''; }
-      if (t === 'stone') { s.classList.add('stone'); label = '石'; }
-      if (t === 'diamond') { s.classList.add('diamond'); label = '鑽'; }
-      if (t === 'event') { s.classList.add('event'); label = '？'; }
+      s.innerHTML = '';
+      let icon = '';
+      if (t === 'dirt') { icon = ''; }
+      if (t === 'stone') { s.classList.add('stone'); icon = '🪨'; }
+      if (t === 'diamond') { s.classList.add('diamond'); icon = '💎'; }
+      if (t === 'event') { s.classList.add('event'); icon = '❓'; }
       if (t === 'puzzle') {
         s.classList.add('puzzle');
-        label = '圖';
+        icon = '🧩';
         s.title = '拼圖碎片';
       }
       if (t === 'empty') { s.classList.add('empty'); }
+      if (icon) {
+        const span = el('span', 'tile-icon', icon);
+        s.appendChild(span);
+      }
       if (i === 0) s.classList.add('current');
-      s.textContent = label;
     }
   };
   renderCol(slotsL, state.previews.left);
@@ -760,6 +810,7 @@ function addKeyboardControls() {
 }
 
 function init() {
+  muted = loadMute();
   renderBase();
   game = new Game(
     s => {

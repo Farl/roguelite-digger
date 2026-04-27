@@ -54,3 +54,11 @@ function checkPuzzleCompletion(meta) {
   }
   saveMeta(meta);
 }
+
+const MUTE_KEY = 'yam_roguelite_muted_v1';
+export function loadMute() {
+  return localStorage.getItem(MUTE_KEY) === '1';
+}
+export function saveMute(muted) {
+  try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch {}
+}

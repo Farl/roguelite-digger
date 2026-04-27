@@ -587,6 +587,29 @@
     }
     #mute-btn:hover { background:rgba(0,0,0,0.35); }
     #mute-btn.muted { opacity:.5; }
+    /* milestone celebration toast */
+    .milestone-toast {
+      position:absolute;
+      left:50%;
+      top:30%;
+      transform:translate(-50%, -8px) scale(0.88);
+      padding:10px 22px;
+      border-radius:var(--radius-pill);
+      background:radial-gradient(circle at 30% 0%,#ffe9b5 0,#c79532 55%,#8f5c19 100%);
+      color:#fffbe6;
+      font-size:16px;
+      font-weight:700;
+      box-shadow:0 6px 20px rgba(0,0,0,0.55);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity 0.2s ease-out, transform 0.2s ease-out;
+      z-index:25;
+    }
+    .milestone-toast.visible {
+      opacity:1;
+      transform:translate(-50%, -18px) scale(1);
+    }
+
     /* tile-slot tokens */
     .tile-slot.current {
       outline:2px solid var(--c-gold);

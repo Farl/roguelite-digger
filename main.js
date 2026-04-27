@@ -20,6 +20,20 @@ let toolIndicatorTimer = null;
 let durabilityPopupTimer = null;
 let lastPuzzleCount = null;
 let muted = false;
+const MILESTONES = [5, 10, 20, 30, 50, 75, 100, 150, 200];
+let lastMilestone = 0;
+
+function showMilestoneToast(depth) {
+  if (!modalRoot) return;
+  const emojis = depth >= 100 ? '🎆' : depth >= 50 ? '✨' : '🎉';
+  const toast = el('div', 'milestone-toast', `${emojis} 深度 ${depth}！`);
+  modalRoot.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 250);
+  }, 1200);
+}
 
 function triggerScrollAnimation() {
   // 動畫移除：保留函式但不做任何事
@@ -765,8 +779,16 @@ function showGameOverModal(onRestart) {
   const backdrop = el('div', 'modal-backdrop');
   backdrop.style.pointerEvents = 'auto';
   const modal = el('div', 'modal');
-  const title = el('div', 'modal-title', '工具全壞了');
+
+  const isNewRecord = state.depth > 0 && state.depth >= (state.bestDepth || 0) && meta && state.depth > (meta.bestDepth || 0);
+  const titleText = isNewRecord ? '🏆 新紀錄！' : '工具全壞了';
+  const title = el('div', 'modal-title', titleText);
+  if (isNewRecord) title.style.color = '#d89b31';
+
   const txt = el('div', 'center-text', `本次深度：${state.depth}`);
+  const prev = meta && meta.bestDepth > 0 ? el('div', 'center-text', `上次最佳：${meta.bestDepth}`) : null;
+  if (prev) prev.style.opacity = '0.65';
+
   const row = el('div', 'modal-footer');
   const btn = el('button', 'btn-primary', '回到地面');
   btn.onclick = () => {
@@ -776,6 +798,7 @@ function showGameOverModal(onRestart) {
   row.appendChild(btn);
   modal.appendChild(title);
   modal.appendChild(txt);
+  if (prev) modal.appendChild(prev);
   modal.appendChild(row);
   backdrop.appendChild(modal);
   modalRoot.appendChild(backdrop);
@@ -818,6 +841,17 @@ function init() {
       state = s;
       updateHUD();
       renderTiles();
+      // milestone celebrations
+      if (state.alive && state.depth > lastMilestone) {
+        for (const m of MILESTONES) {
+          if (state.depth >= m && lastMilestone < m) {
+            showMilestoneToast(m);
+            lastMilestone = m;
+            break;
+          }
+        }
+      }
+      if (!state.alive) { lastMilestone = 0; }
     },
     (eventData, done) => {
       showEventModal(eventData, done);

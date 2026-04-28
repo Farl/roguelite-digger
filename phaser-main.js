@@ -48,9 +48,10 @@ class DiggerScene extends Phaser.Scene {
     this.inEvent    = false;
     this.eventDone  = null;
     this.eventOptions = [];
-    this.lastMilestone = 0;
-    this.bestScore  = 0;
-    this.toasts     = [];
+    this.lastMilestone  = 0;
+    this.bestScore      = 0;
+    this.toasts         = [];
+    this.lastPuzzleCount = null;
   }
 
   preload() {
@@ -131,6 +132,11 @@ class DiggerScene extends Phaser.Scene {
       this.muteBtn.setText(_muted ? '🔇' : '🔊');
     });
 
+    // ── Bottom info bar
+    this.infoText = this.add.text(12, HEIGHT - 22, '', {
+      fontFamily: 'Arial', fontSize: '11px', color: '#604830'
+    }).setDepth(5);
+
     // ── Modal layer (drawn last = on top)
     this.modalLayer = this.add.container(0, 0).setDepth(100);
 
@@ -139,7 +145,7 @@ class DiggerScene extends Phaser.Scene {
       s   => this._onUpdate(s),
       (e, done) => this._onEvent(e, done),
       r   => this._onGameOver(r),
-      (m) => { this.meta = m; }
+      (m, _relics, lastPuzzlePiece) => this._onMeta(m, lastPuzzlePiece)
     );
 
     // ── Start with difficulty modal
@@ -220,6 +226,41 @@ class DiggerScene extends Phaser.Scene {
   // Game callbacks
   // ────────────────────────────────────────────────────────────────
 
+  _onMeta(meta, lastPuzzlePiece) {
+    const prevCount = this.lastPuzzleCount;
+    this.meta = meta;
+    const currCount = meta?.puzzlePieces?.length ?? 0;
+    if (prevCount !== null && currCount > prevCount && lastPuzzlePiece) {
+      const { id, size, index } = lastPuzzlePiece;
+      const needed = size === 2 ? 4 : 9;
+      const groups = {};
+      for (const p of (meta.puzzlePieces || [])) {
+        const k = `${p.id}_${p.size}`;
+        if (!groups[k]) groups[k] = new Set();
+        groups[k].add(p.index);
+      }
+      const uniqueCount = (groups[`${id}_${size}`]?.size) || 0;
+      this._showToast(`獲得 拼圖${id}（${size}×${size}）第 ${(index ?? 0) + 1} 片（${uniqueCount}/${needed}）`, '#c8d87e', 1400);
+    }
+    this.lastPuzzleCount = currCount;
+    // Update bottom info
+    if (this.infoText) {
+      const runs = meta?.runs ?? 0;
+      const pieces = currCount;
+      this.infoText.setText(`遊戲數 ${runs}　收穫拼圖 ${pieces}`);
+    }
+  }
+
+  _spawnDamagePopup(dmg) {
+    const x = this.worker.x + Phaser.Math.Between(-20, 20);
+    const y = this.worker.y - 20;
+    const t = this.add.text(x, y, `-${dmg}`, {
+      fontFamily: 'Arial', fontSize: '22px', color: '#ff6644',
+      stroke: '#000000', strokeThickness: 3
+    }).setOrigin(0.5, 1).setDepth(80);
+    this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 700, ease: 'Power1', onComplete: () => t.destroy() });
+  }
+
   _onUpdate(state) {
     this.prevState = this.state;
     this.state = state;
@@ -271,9 +312,13 @@ class DiggerScene extends Phaser.Scene {
     );
     this.cameras.main.setBackgroundColor(Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b));
 
-    // ── SFX on state changes
+    // ── SFX + damage popup on state changes
     if (this.prevState) {
-      if (state.tools < this.prevState.tools) sfx.hit();
+      const dmg = this.prevState.tools - state.tools;
+      if (dmg > 0) {
+        sfx.hit();
+        this._spawnDamagePopup(dmg);
+      }
       if (state.stats?.diamondsHit > (this.prevState.stats?.diamondsHit || 0)) sfx.diamond();
     }
 

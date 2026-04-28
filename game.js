@@ -58,13 +58,16 @@ export class Game {
 
   computeRelics() {
     // 所有遺物統一改成「增加耐久度」型效果，方便理解
-    const relics = { extraTool: 0 };
+    const relics = { extraTool: 0, surveyAura: false };
     if (this.meta.unlockedRelics.includes('extra_tool')) {
       relics.extraTool += 1;
     }
     if (this.meta.unlockedRelics.includes('stone_resist')) {
       // 石頭護符：改為開局額外 +1 耐久
       relics.extraTool += 1;
+    }
+    if (this.meta.unlockedRelics.includes('survey_aura')) {
+      relics.surveyAura = true;
     }
     return relics;
   }
@@ -121,10 +124,21 @@ export class Game {
       }
     }
 
-    return {
+    const result = {
       left: rows.map(r => r.left),
       right: rows.map(r => r.right)
     };
+
+    // survey_aura relic: clear hazards from bottom 2 preview rows
+    if (this.relicEffects.surveyAura) {
+      const safe = (t) => (t === TILE_TYPES.STONE || t === TILE_TYPES.DIAMOND) ? TILE_TYPES.DIRT : t;
+      result.left[3] = safe(result.left[3]);
+      result.left[4] = safe(result.left[4]);
+      result.right[3] = safe(result.right[3]);
+      result.right[4] = safe(result.right[4]);
+    }
+
+    return result;
   }
 
   step(side) {
@@ -239,8 +253,20 @@ export class Game {
       return;
     }
 
-    const size = Math.random() < 0.6 ? 2 : 3;
-    const id = size === 2 ? 'A' : 'B';
+    const roll = Math.random();
+    const size = roll < 0.4 ? 2 : roll < 0.7 ? 3 : 2;
+    // Three puzzle types: A(2x2)→extra_tool, B(3x3)→stone_resist, C(2x2)→survey_aura
+    let id;
+    if (size === 2) {
+      // 50/50 between A and C for 2x2
+      const aComplete = this.meta.unlockedRelics.includes('extra_tool');
+      const cComplete = this.meta.unlockedRelics.includes('survey_aura');
+      if (aComplete && !cComplete) id = 'C';
+      else if (!aComplete && cComplete) id = 'A';
+      else id = Math.random() < 0.5 ? 'A' : 'C';
+    } else {
+      id = 'B';
+    }
     const maxIndex = size * size;
 
     // 優先給「尚未拿過的位置」，避免重複拿到同一片

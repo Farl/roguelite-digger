@@ -42,13 +42,15 @@ function checkPuzzleCompletion(meta) {
     groups[key].push(p.index);
   }
   const needed = { 2:4, 3:9 };
+  // Map puzzle id to relic
+  const relicByKey = { 'A_2': 'extra_tool', 'B_3': 'stone_resist', 'C_2': 'survey_aura' };
   for (const key of Object.keys(groups)) {
-    const [id,sizeStr] = key.split('_');
+    const [id, sizeStr] = key.split('_');
     const size = Number(sizeStr);
     const set = new Set(groups[key]);
     if (set.size === needed[size]) {
-      const relic = size === 2 ? 'extra_tool' : 'stone_resist';
-      if (!meta.unlockedRelics.includes(relic)) meta.unlockedRelics.push(relic);
+      const relic = relicByKey[key];
+      if (relic && !meta.unlockedRelics.includes(relic)) meta.unlockedRelics.push(relic);
       meta.puzzlePieces = meta.puzzlePieces.filter(p => !(p.id === id && p.size === size));
     }
   }

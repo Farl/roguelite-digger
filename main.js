@@ -201,6 +201,9 @@ function showCollectionModal() {
     if (meta.unlockedRelics.includes('stone_resist')) {
       relicList.appendChild(el('div', null, '・石頭護符：每場開始時 +1 工具耐久'));
     }
+    if (meta.unlockedRelics.includes('survey_aura')) {
+      relicList.appendChild(el('div', null, '・探勘磁力：每場開始時，最底兩層危險格自動變泥土'));
+    }
   } else {
     relicList.appendChild(el('div', null, '目前還沒有解鎖任何遺物'));
   }
@@ -242,9 +245,11 @@ function showCollectionModal() {
       const size = Number(sizeStr);
       const uniqueIndexes = new Set(groups[key]);
       const totalNeeded = size === 2 ? 4 : 9;
-      const relicName = size === 2
-        ? '額外工具（開局 +1 工具耐久）'
-        : '石頭護符（開局 +1 工具耐久）';
+      const relicName = size === 3
+        ? '石頭護符（開局 +1 工具耐久）'
+        : id === 'C'
+          ? '探勘磁力（最底兩層危險格→泥土）'
+          : '額外工具（開局 +1 工具耐久）';
 
       const row = document.createElement('div');
       row.style.display = 'flex';
@@ -702,6 +707,11 @@ function updateRelics() {
   if (meta.unlockedRelics.includes('stone_resist')) {
     const r = el('div', 'relic-icon', '岩');
     r.title = '石頭護符：每場開始時 +1 工具耐久';
+    wrap.appendChild(r);
+  }
+  if (meta.unlockedRelics.includes('survey_aura')) {
+    const r = el('div', 'relic-icon', '🧲');
+    r.title = '探勘磁力：每場開始時，最底兩層危險格自動變泥土';
     wrap.appendChild(r);
   }
 }

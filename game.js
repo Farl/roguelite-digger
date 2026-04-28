@@ -51,6 +51,7 @@ export class Game {
     this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
     this.safeStreak = 0;
     this.maxSafeStreak = 0;
+    this.difficulty = 'normal'; // 'easy' | 'normal' | 'hard'
     this.startRun();
   }
 
@@ -67,8 +68,10 @@ export class Game {
     return relics;
   }
 
-  startRun() {
-    const baseTools = 6;
+  startRun(difficulty) {
+    if (difficulty) this.difficulty = difficulty;
+    const baseToolsByDiff = { easy: 9, normal: 6, hard: 4 };
+    const baseTools = baseToolsByDiff[this.difficulty] || 6;
     this.tools = baseTools + this.relicEffects.extraTool;
     this.maxTools = this.tools;
     this.depth = 0;
@@ -283,8 +286,8 @@ export class Game {
     this.stopAutoDig();
 
     this.onUpdate(this.getState());
-    this.onGameOver(() => {
-      this.startRun();
+    this.onGameOver(diff => {
+      this.startRun(diff);
     });
   }
 
@@ -297,6 +300,8 @@ export class Game {
     const useSoft = this.biasSoft > 0;
     // 深度越深，石頭機率提高（每 10 層 +2%，上限 +20%）
     const depthBonus = Math.min(0.20, Math.floor(rowDepth / 10) * 0.02);
+    // difficulty modifier: easy -0.10, normal 0, hard +0.10
+    const diffMod = this.difficulty === 'easy' ? -0.10 : this.difficulty === 'hard' ? 0.10 : 0;
 
     const randomTileBase = () => {
       const r = Math.random();
@@ -307,7 +312,7 @@ export class Game {
         if (r < 0.83) return TILE_TYPES.DIAMOND;
         return TILE_TYPES.EVENT;
       } else {
-        const stoneThresh = 0.50 - depthBonus;
+        const stoneThresh = 0.50 - depthBonus + diffMod;
         const diamondThresh = stoneThresh + 0.25 + depthBonus * 0.5;
         const eventThresh = diamondThresh + 0.07;
         if (r < stoneThresh) return TILE_TYPES.DIRT;
@@ -574,7 +579,8 @@ export class Game {
       stats: { ...this.stats },
       safeStreak: this.safeStreak,
       maxSafeStreak: this.maxSafeStreak,
-      score: this._calcScore()
+      score: this._calcScore(),
+      difficulty: this.difficulty
     };
   }
 

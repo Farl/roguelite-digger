@@ -1,5 +1,5 @@
 import { Game } from './game.js';
-import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore } from './storage.js';
+import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore, loadLeaderboard, addLeaderboardEntry } from './storage.js';
 
 const app = document.getElementById('app');
 
@@ -937,6 +937,47 @@ function showEventModal(eventData, done) {
   }, 120);
 }
 
+function showDifficultyModal(onSelect) {
+  if (!modalRoot) return;
+  modalRoot.innerHTML = '';
+  const backdrop = el('div', 'modal-backdrop');
+  backdrop.style.pointerEvents = 'auto';
+  const modal = el('div', 'modal');
+  const title = el('div', 'modal-title', '選擇難度');
+  const desc = el('div', 'center-text', '難度影響初始工具耐久與石頭機率');
+  desc.style.fontSize = '11px';
+  desc.style.opacity = '0.7';
+  desc.style.marginBottom = '8px';
+
+  const choices = el('div', 'choice-options');
+  const diffs = [
+    { key: 'easy', label: '😌 簡單', sub: '初始 9 耐久，石頭少' },
+    { key: 'normal', label: '⛏ 普通', sub: '初始 6 耐久，標準石頭' },
+    { key: 'hard', label: '💀 困難', sub: '初始 4 耐久，石頭更多' },
+  ];
+  for (const d of diffs) {
+    const card = el('div', 'choice-option diff-card');
+    const lbl = el('div', null, d.label);
+    lbl.style.fontWeight = '700';
+    const sub = el('div', null, d.sub);
+    sub.style.fontSize = '10px';
+    sub.style.opacity = '0.7';
+    card.appendChild(lbl);
+    card.appendChild(sub);
+    card.addEventListener('click', () => {
+      modalRoot.innerHTML = '';
+      onSelect(d.key);
+    });
+    choices.appendChild(card);
+  }
+
+  modal.appendChild(title);
+  modal.appendChild(desc);
+  modal.appendChild(choices);
+  backdrop.appendChild(modal);
+  modalRoot.appendChild(backdrop);
+}
+
 function showGameOverModal(onRestart) {
   sfxGameOver();
   // screen shake
@@ -996,11 +1037,39 @@ function showGameOverModal(onRestart) {
     statsEl.textContent = `🪨 ${stonesHit}　💎 ${diamondsHit}　❓ ${eventsTriggered}`;
   }
 
+  // save leaderboard entry
+  const leaderboard = addLeaderboardEntry({
+    depth: state.depth,
+    score: score,
+    difficulty: state.difficulty || 'normal',
+    date: new Date().toLocaleDateString('zh-TW')
+  });
+
+  // leaderboard display
+  const lbEl = el('div');
+  lbEl.style.marginTop = '6px';
+  lbEl.style.fontSize = '10px';
+  lbEl.style.opacity = '0.75';
+  if (leaderboard.length > 0) {
+    const lbTitle = el('div', null, '🏅 本機排行 Top 5');
+    lbTitle.style.fontWeight = '700';
+    lbTitle.style.marginBottom = '2px';
+    lbEl.appendChild(lbTitle);
+    for (let i = 0; i < leaderboard.length; i++) {
+      const entry = leaderboard[i];
+      const diffLabel = entry.difficulty === 'easy' ? '簡' : entry.difficulty === 'hard' ? '難' : '普';
+      const row = el('div', null, `${i + 1}. 分${entry.score}　深${entry.depth}　${diffLabel}　${entry.date || ''}`);
+      lbEl.appendChild(row);
+    }
+  }
+
   const row = el('div', 'modal-footer');
   const btn = el('button', 'btn-primary', '回到地面');
   btn.onclick = () => {
     modalRoot.innerHTML = '';
-    onRestart();
+    showDifficultyModal(diff => {
+      onRestart(diff);
+    });
   };
   row.appendChild(btn);
   modal.appendChild(title);
@@ -1010,6 +1079,7 @@ function showGameOverModal(onRestart) {
   modal.appendChild(prevScoreEl);
   if (state.maxSafeStreak >= 3) modal.appendChild(streakEl);
   modal.appendChild(statsEl);
+  modal.appendChild(lbEl);
   modal.appendChild(row);
   backdrop.appendChild(modal);
   modalRoot.appendChild(backdrop);
@@ -1072,7 +1142,9 @@ function init() {
       showEventModal(eventData, done);
     },
     onRestart => {
-      showGameOverModal(onRestart);
+      showGameOverModal(diff => {
+        onRestart(diff);
+      });
     },
     (m, relics, lastPuzzlePiece) => {
       meta = m;
@@ -1091,6 +1163,10 @@ function init() {
     }
   );
   addKeyboardControls();
+  // Show difficulty selection on first run
+  showDifficultyModal(diff => {
+    game.startRun(diff);
+  });
 }
 
 init();

@@ -78,3 +78,22 @@ export function loadBestScore() {
 export function saveBestScore(score) {
   try { localStorage.setItem(SCORE_KEY, String(score)); } catch {}
 }
+
+const LEADERBOARD_KEY = 'yam_roguelite_leaderboard_v1';
+export function loadLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+export function addLeaderboardEntry(entry) {
+  // entry: { depth, score, difficulty, date }
+  try {
+    const board = loadLeaderboard();
+    board.push(entry);
+    board.sort((a, b) => b.score - a.score);
+    const top5 = board.slice(0, 5);
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(top5));
+    return top5;
+  } catch { return []; }
+}

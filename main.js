@@ -10,6 +10,58 @@ function el(tag, className, text) {
   return e;
 }
 
+// ─── Web Audio Synthesizer ───────────────────────────────────────
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone({ freq = 440, type = 'sine', duration = 0.08, gainPeak = 0.18, detune = 0 } = {}) {
+  if (muted) return;
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    osc.detune.setValueAtTime(detune, ctx.currentTime);
+    gain.gain.setValueAtTime(gainPeak, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch (_) {}
+}
+
+function sfxDig() {
+  playTone({ freq: 220, type: 'triangle', duration: 0.06, gainPeak: 0.12 });
+}
+function sfxHit() {
+  playTone({ freq: 110, type: 'sawtooth', duration: 0.12, gainPeak: 0.22 });
+  setTimeout(() => playTone({ freq: 80, type: 'sawtooth', duration: 0.08, gainPeak: 0.12 }), 60);
+}
+function sfxDiamond() {
+  playTone({ freq: 880, type: 'sine', duration: 0.15, gainPeak: 0.18 });
+  setTimeout(() => playTone({ freq: 1100, type: 'sine', duration: 0.10, gainPeak: 0.10 }), 80);
+}
+function sfxEvent() {
+  playTone({ freq: 660, type: 'triangle', duration: 0.12, gainPeak: 0.15 });
+  setTimeout(() => playTone({ freq: 880, type: 'triangle', duration: 0.10, gainPeak: 0.12 }), 100);
+}
+function sfxGameOver() {
+  playTone({ freq: 220, type: 'sawtooth', duration: 0.18, gainPeak: 0.25 });
+  setTimeout(() => playTone({ freq: 165, type: 'sawtooth', duration: 0.20, gainPeak: 0.20 }), 150);
+  setTimeout(() => playTone({ freq: 110, type: 'sawtooth', duration: 0.35, gainPeak: 0.18 }), 300);
+}
+function sfxMilestone() {
+  playTone({ freq: 523, type: 'sine', duration: 0.10, gainPeak: 0.20 });
+  setTimeout(() => playTone({ freq: 659, type: 'sine', duration: 0.10, gainPeak: 0.18 }), 80);
+  setTimeout(() => playTone({ freq: 784, type: 'sine', duration: 0.18, gainPeak: 0.22 }), 160);
+}
+// ─────────────────────────────────────────────────────────────────
+
 let game;
 let state = null;
 let prevState = null;
@@ -61,6 +113,7 @@ function dig(side) {
 
   moveWorkerToSide(side);
   triggerScrollAnimation();
+  sfxDig();
   game.step(side);
 
   // digBounce animation on worker-tool
@@ -580,6 +633,8 @@ function updateHUD() {
     (!prevState || !prevState.lastHit || state.lastHit.time !== prevState.lastHit.time)
   ) {
     showDurabilityPopup(state.lastHit.dmg);
+    // sfx
+    if (state.lastHit.dmg >= 2) sfxDiamond(); else sfxHit();
     // hit flash
     const flash = document.getElementById('hit-flash');
     if (flash) {
@@ -753,6 +808,7 @@ function renderTiles() {
 }
 
 function showEventModal(eventData, done) {
+  sfxEvent();
   const { mode, title: eventTitle, desc: eventDesc, options } = eventData;
 
   modalRoot.innerHTML = '';
@@ -882,6 +938,13 @@ function showEventModal(eventData, done) {
 }
 
 function showGameOverModal(onRestart) {
+  sfxGameOver();
+  // screen shake
+  const digArea = document.getElementById('dig-area');
+  if (digArea) {
+    digArea.classList.add('screen-shake');
+    digArea.addEventListener('animationend', () => digArea.classList.remove('screen-shake'), { once: true });
+  }
   modalRoot.innerHTML = '';
   const backdrop = el('div', 'modal-backdrop');
   backdrop.style.pointerEvents = 'auto';
@@ -997,6 +1060,7 @@ function init() {
         for (const m of MILESTONES) {
           if (state.depth >= m && lastMilestone < m) {
             showMilestoneToast(m);
+            sfxMilestone();
             lastMilestone = m;
             break;
           }

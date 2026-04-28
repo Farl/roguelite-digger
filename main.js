@@ -1161,6 +1161,16 @@ function init() {
         }
         sfxMilestone();
       }
+      // streak bonus toast
+      if (state.streakBonus && (!prevState || !prevState.streakBonus || state.streakBonus.time !== prevState.streakBonus.time)) {
+        const toast = el('div', 'milestone-toast', `🔥 ${state.streakBonus.streak} 連挖！+1 耐久`);
+        if (modalRoot) {
+          modalRoot.appendChild(toast);
+          requestAnimationFrame(() => toast.classList.add('visible'));
+          setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.parentNode && toast.parentNode.removeChild(toast), 250); }, 1400);
+        }
+        sfxMilestone();
+      }
       // milestone celebrations
       if (state.alive && state.depth > lastMilestone) {
         for (const m of MILESTONES) {

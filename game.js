@@ -53,6 +53,7 @@ export class Game {
     this.maxSafeStreak = 0;
     this.difficulty = 'normal'; // 'easy' | 'normal' | 'hard'
     this.depthBonus = null;
+    this.streakBonus = null;
     this.startRun();
   }
 
@@ -96,6 +97,7 @@ export class Game {
     this.safeStreak = 0;
     this.maxSafeStreak = 0;
     this.depthBonus = null;
+    this.streakBonus = null;
 
     this.previews = this.generatePreviews();
     this.onUpdate(this.getState());
@@ -181,6 +183,12 @@ export class Game {
       // dirt or empty — safe dig
       this.safeStreak++;
       if (this.safeStreak > this.maxSafeStreak) this.maxSafeStreak = this.safeStreak;
+      // Streak bonus: every 15 safe digs, +1 tool
+      if (this.safeStreak > 0 && this.safeStreak % 15 === 0) {
+        this.tools += 1;
+        this.maxTools = Math.max(this.maxTools, this.tools);
+        this.streakBonus = { streak: this.safeStreak, time: performance.now() };
+      }
     }
 
     this.finishStep();
@@ -200,6 +208,8 @@ export class Game {
 
     // 基礎傷害：鑽石比石頭更痛
     let dmg = tile === TILE_TYPES.DIAMOND ? 2 : 1;
+    // Hard mode: +1 damage from stone
+    if (this.difficulty === 'hard' && tile === TILE_TYPES.STONE) dmg += 1;
     if (tile === TILE_TYPES.STONE) this.stats.stonesHit++;
     if (tile === TILE_TYPES.DIAMOND) this.stats.diamondsHit++;
 
@@ -447,6 +457,27 @@ export class Game {
         }
       });
     }
+    // 深度 > 30 時，加入高風險高回報選項
+    if (this.depth > 30) {
+      choiceOptions.push({
+        id: 'supply_depot',
+        title: '地瓜補給站',
+        desc: '+3 耐久，但接下來 5 格全為石頭/鑽石危機',
+        apply: () => {
+          this.tools += 3;
+          this.maxTools = Math.max(this.maxTools, this.tools);
+          // Force next 5 tiles on both sides to be stone
+          for (let i = 0; i < 5; i++) {
+            if (i < this.previews.left.length) {
+              this.previews.left[i] = Math.random() < 0.5 ? TILE_TYPES.STONE : TILE_TYPES.DIAMOND;
+            }
+            if (i < this.previews.right.length) {
+              this.previews.right[i] = Math.random() < 0.5 ? TILE_TYPES.STONE : TILE_TYPES.DIAMOND;
+            }
+          }
+        }
+      });
+    }
 
     // 從 choice 池隨機抽 3 個
     const shuffleChoice = [...choiceOptions].sort(() => Math.random() - 0.5).slice(0, 3);
@@ -626,7 +657,8 @@ export class Game {
       maxSafeStreak: this.maxSafeStreak,
       score: this._calcScore(),
       difficulty: this.difficulty,
-      depthBonus: this.depthBonus
+      depthBonus: this.depthBonus,
+      streakBonus: this.streakBonus
     };
   }
 

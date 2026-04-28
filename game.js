@@ -49,6 +49,8 @@ export class Game {
     this.minStepIntervalMs = 90;
 
     this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
+    this.safeStreak = 0;
+    this.maxSafeStreak = 0;
     this.startRun();
   }
 
@@ -84,6 +86,8 @@ export class Game {
     this.lastSide = 'left';
 
     this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
+    this.safeStreak = 0;
+    this.maxSafeStreak = 0;
 
     this.previews = this.generatePreviews();
     this.onUpdate(this.getState());
@@ -146,6 +150,7 @@ export class Game {
 
     // 根據當前格子類型處理效果
     if (tile === TILE_TYPES.STONE || tile === TILE_TYPES.DIAMOND) {
+      this.safeStreak = 0;
       const survived = this.handleHazardTile(tile);
       if (!survived) return;
     } else if (tile === TILE_TYPES.EVENT) {
@@ -153,6 +158,10 @@ export class Game {
       return;
     } else if (tile === TILE_TYPES.PUZZLE) {
       this.handlePuzzleTile();
+    } else {
+      // dirt or empty — safe dig
+      this.safeStreak++;
+      if (this.safeStreak > this.maxSafeStreak) this.maxSafeStreak = this.safeStreak;
     }
 
     this.finishStep();
@@ -552,7 +561,17 @@ export class Game {
       lastHit: this.lastHit,
       lastPuzzlePiece: this.lastPuzzlePiece,
       goldPlatingActive: this.goldPlatingActive,
-      stats: { ...this.stats }
+      stats: { ...this.stats },
+      safeStreak: this.safeStreak,
+      maxSafeStreak: this.maxSafeStreak,
+      score: this._calcScore()
     };
+  }
+
+  _calcScore() {
+    if (this.depth === 0) return 0;
+    const hazards = this.stats.stonesHit + this.stats.diamondsHit * 2;
+    const efficiency = Math.max(0, 1 - hazards / this.depth);
+    return Math.round(this.depth * (1 + efficiency) * 10);
   }
 }

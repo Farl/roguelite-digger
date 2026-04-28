@@ -70,3 +70,11 @@ export function loadHintDismissed() {
 export function saveHintDismissed() {
   try { localStorage.setItem(HINT_KEY, '1'); } catch {}
 }
+
+const SCORE_KEY = 'yam_roguelite_bestscore_v1';
+export function loadBestScore() {
+  return parseInt(localStorage.getItem(SCORE_KEY) || '0', 10);
+}
+export function saveBestScore(score) {
+  try { localStorage.setItem(SCORE_KEY, String(score)); } catch {}
+}

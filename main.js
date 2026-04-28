@@ -1,5 +1,5 @@
 import { Game } from './game.js';
-import { loadMute, saveMute, loadHintDismissed, saveHintDismissed } from './storage.js';
+import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore } from './storage.js';
 
 const app = document.getElementById('app');
 
@@ -20,6 +20,7 @@ let toolIndicatorTimer = null;
 let durabilityPopupTimer = null;
 let lastPuzzleCount = null;
 let muted = false;
+let bestScore = 0;
 const MILESTONES = [5, 10, 20, 30, 50, 75, 100, 150, 200];
 let lastMilestone = 0;
 
@@ -645,6 +646,27 @@ function updateSurface() {
   elInfo.textContent = `地面 · 遊戲數 ${meta.runs} · 收穫拼圖 ${meta.puzzlePieces.length}`;
 }
 
+function updateStreak() {
+  if (!state) return;
+  let streakEl = document.getElementById('streak-badge');
+  if (!streakEl) {
+    // Create streak badge next to depth badge
+    const hud = document.querySelector('.hud-section');
+    if (!hud) return;
+    streakEl = el('div', 'streak-badge');
+    streakEl.id = 'streak-badge';
+    hud.appendChild(streakEl);
+  }
+  const streak = state.safeStreak || 0;
+  if (streak >= 5) {
+    const fire = streak >= 20 ? '🔥🔥' : streak >= 10 ? '🔥' : '✨';
+    streakEl.textContent = `${fire} ×${streak}`;
+    streakEl.style.display = '';
+  } else {
+    streakEl.style.display = 'none';
+  }
+}
+
 function setToolIndicatorVisibility(side, visible) {
   const leftEl = document.getElementById('tool-indicator-left');
   const rightEl = document.getElementById('tool-indicator-right');
@@ -866,6 +888,33 @@ function showGameOverModal(onRestart) {
   const prev = meta && meta.bestDepth > 0 ? el('div', 'center-text', `上次最佳：${meta.bestDepth}`) : null;
   if (prev) prev.style.opacity = '0.65';
 
+  // score
+  const score = state.score || 0;
+  const prevBestScore = bestScore;
+  const isNewScore = score > bestScore;
+  if (isNewScore) {
+    bestScore = score;
+    saveBestScore(bestScore);
+  }
+  const scoreEl = el('div', 'center-text');
+  scoreEl.style.fontSize = '13px';
+  scoreEl.style.fontWeight = '700';
+  scoreEl.style.color = isNewScore ? '#d89b31' : '#6a5a3a';
+  scoreEl.textContent = isNewScore ? `⭐ 最高分：${score}` : `分數：${score}`;
+  const prevScoreEl = el('div', 'center-text');
+  prevScoreEl.style.fontSize = '11px';
+  prevScoreEl.style.opacity = '0.6';
+  prevScoreEl.textContent = isNewScore ? `舊紀錄：${prevBestScore}` : `最高分：${bestScore}`;
+
+  // streak
+  const streakEl = el('div', 'center-text');
+  streakEl.style.fontSize = '11px';
+  streakEl.style.opacity = '0.72';
+  streakEl.style.marginTop = '2px';
+  if (state.maxSafeStreak >= 3) {
+    streakEl.textContent = `🔥 最長安全連挖：${state.maxSafeStreak} 格`;
+  }
+
   // run stats
   const statsEl = el('div', 'center-text');
   statsEl.style.fontSize = '11px';
@@ -886,6 +935,9 @@ function showGameOverModal(onRestart) {
   modal.appendChild(title);
   modal.appendChild(txt);
   if (prev) modal.appendChild(prev);
+  modal.appendChild(scoreEl);
+  modal.appendChild(prevScoreEl);
+  if (state.maxSafeStreak >= 3) modal.appendChild(streakEl);
   modal.appendChild(statsEl);
   modal.appendChild(row);
   backdrop.appendChild(modal);
@@ -922,6 +974,7 @@ function addKeyboardControls() {
 
 function init() {
   muted = loadMute();
+  bestScore = loadBestScore();
   renderBase();
   game = new Game(
     s => {
@@ -929,6 +982,7 @@ function init() {
       state = s;
       updateHUD();
       renderTiles();
+      updateStreak();
       // milestone celebrations
       if (state.alive && state.depth > lastMilestone) {
         for (const m of MILESTONES) {

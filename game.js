@@ -449,6 +449,16 @@ export class Game {
         title: '鍍金護盾',
         desc: '下一次石頭或鑽石傷害無效',
         apply: () => { this.goldPlatingActive = true; }
+      },
+      {
+        id: 'survey',
+        title: '地瓜探勘',
+        desc: '清除兩側最底層危險格（石頭/鑽石→泥土）',
+        apply: () => {
+          const safe = (t) => (t === TILE_TYPES.STONE || t === TILE_TYPES.DIAMOND) ? TILE_TYPES.DIRT : t;
+          this.previews.left[4] = safe(this.previews.left[4]);
+          this.previews.right[4] = safe(this.previews.right[4]);
+        }
       }
     ];
 

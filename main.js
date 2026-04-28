@@ -643,7 +643,8 @@ function updateRelics() {
 function updateSurface() {
   const elInfo = document.getElementById('surface-info');
   if (!elInfo || !meta) return;
-  elInfo.textContent = `地面 · 遊戲數 ${meta.runs} · 收穫拼圖 ${meta.puzzlePieces.length}`;
+  const scoreText = state && state.score > 0 ? `　分 ${state.score}` : '';
+  elInfo.textContent = `地面 · 遊戲數 ${meta.runs} · 收穫拼圖 ${meta.puzzlePieces.length}${scoreText}`;
 }
 
 function updateStreak() {
@@ -715,7 +716,7 @@ function renderTiles() {
   if (!colL || !colR) return;
   const slotsL = Array.from(colL.querySelectorAll('.tile-slot'));
   const slotsR = Array.from(colR.querySelectorAll('.tile-slot'));
-  const renderCol = (slots, tiles) => {
+  const renderCol = (slots, tiles, prevTiles) => {
     for (let i = 0; i < 5; i++) {
       const s = slots[i];
       const t = tiles[i];
@@ -738,10 +739,17 @@ function renderTiles() {
         s.appendChild(span);
       }
       if (i === 0) s.classList.add('current');
+      // Animate bottom tile if it changed
+      if (i === 4 && prevTiles && prevTiles[4] !== t) {
+        s.classList.add('tile-enter');
+        s.addEventListener('animationend', () => s.classList.remove('tile-enter'), { once: true });
+      }
     }
   };
-  renderCol(slotsL, state.previews.left);
-  renderCol(slotsR, state.previews.right);
+  const prevLeft = prevState && prevState.previews ? prevState.previews.left : null;
+  const prevRight = prevState && prevState.previews ? prevState.previews.right : null;
+  renderCol(slotsL, state.previews.left, prevLeft);
+  renderCol(slotsR, state.previews.right, prevRight);
 }
 
 function showEventModal(eventData, done) {
@@ -983,6 +991,7 @@ function init() {
       updateHUD();
       renderTiles();
       updateStreak();
+      updateSurface();
       // milestone celebrations
       if (state.alive && state.depth > lastMilestone) {
         for (const m of MILESTONES) {

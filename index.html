@@ -676,6 +676,15 @@
       transform:translate(-50%, -18px) scale(1);
     }
 
+    /* tile enter animation */
+    @keyframes tileEnter {
+      from { transform: translateY(10px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .tile-slot.tile-enter {
+      animation: tileEnter 0.18s ease-out forwards;
+    }
+
     /* streak badge */
     .streak-badge {
       display: inline-block;

@@ -332,8 +332,7 @@ function showHelpModal() {
     ['A / ←', '挖左側'],
     ['D / →', '挖右側'],
     ['W/S/空格', '沿上次方向挖'],
-    ['1', '挖左側'],
-    ['2', '挖右側'],
+    ['1 / 2 / 3', '事件時選擇選項（1=左，2=中，3=右）'],
     ['P / Esc', '暫停 / 繼續'],
   ];
   for (const [k, v] of shortcuts) {
@@ -844,10 +843,14 @@ function showEventModal(eventData, done) {
   const cardClass = isChoice ? 'choice-option' : 'wheel-option';
 
   const wheel = el('div', containerClass);
-  const cards = options.map(o => {
+  const cards = options.map((o, idx) => {
     const c = el('div', cardClass);
     const name = el('span', null, o.title);
     const d = el('span', null, o.desc);
+    if (mode === 'choice') {
+      const keyHint = el('span', 'choice-key-hint', `[${idx + 1}]`);
+      c.appendChild(keyHint);
+    }
     c.appendChild(name);
     c.appendChild(d);
     wheel.appendChild(c);
@@ -879,13 +882,13 @@ function showEventModal(eventData, done) {
     });
 
     keyHandler = (e) => {
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === '1') {
         e.preventDefault();
         select(0);
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === '3') {
         e.preventDefault();
         select(cards.length - 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === '2') {
         e.preventDefault();
         if (cards.length >= 2) select(1);
       }

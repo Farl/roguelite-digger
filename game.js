@@ -52,6 +52,7 @@ export class Game {
     this.safeStreak = 0;
     this.maxSafeStreak = 0;
     this.difficulty = 'normal'; // 'easy' | 'normal' | 'hard'
+    this.depthBonus = null;
     this.startRun();
   }
 
@@ -91,6 +92,7 @@ export class Game {
     this.stats = { stonesHit: 0, diamondsHit: 0, eventsTriggered: 0 };
     this.safeStreak = 0;
     this.maxSafeStreak = 0;
+    this.depthBonus = null;
 
     this.previews = this.generatePreviews();
     this.onUpdate(this.getState());
@@ -274,7 +276,24 @@ export class Game {
       this.meta.bestDepth = this.depth;
       saveMeta(this.meta);
     }
+    // Depth milestone bonus every 50 layers (but not at puzzle layers)
+    if (this.depth > 0 && this.depth % 50 === 0 && this.depth % 20 !== 0) {
+      this._applyDepthBonus();
+    }
     this.onUpdate(this.getState());
+  }
+
+  _applyDepthBonus() {
+    // Alternate between gold shield and +1 tool
+    const milestone = this.depth / 50;
+    if (milestone % 2 === 0) {
+      this.tools += 1;
+      this.maxTools = Math.max(this.maxTools, this.tools);
+    } else {
+      this.goldPlatingActive = true;
+    }
+    // Signal to UI with a special lastHit-like field
+    this.depthBonus = { depth: this.depth, time: performance.now() };
   }
 
   endRun() {
@@ -580,7 +599,8 @@ export class Game {
       safeStreak: this.safeStreak,
       maxSafeStreak: this.maxSafeStreak,
       score: this._calcScore(),
-      difficulty: this.difficulty
+      difficulty: this.difficulty,
+      depthBonus: this.depthBonus
     };
   }
 

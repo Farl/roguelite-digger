@@ -675,6 +675,17 @@ function updateHUD() {
   }
 
   updateToolIndicator();
+
+  // depth-based background darkening
+  if (state.depth !== undefined) {
+    const digArea = document.getElementById('dig-area');
+    if (digArea) {
+      const depthRatio = Math.min(1, state.depth / 150);
+      // darken from light brown to deep dark brown
+      const lightness = Math.round(22 - depthRatio * 12); // 22% -> 10%
+      digArea.style.background = `hsl(30, 28%, ${lightness}%)`;
+    }
+  }
 }
 
 function updateRelics() {
@@ -1125,6 +1136,18 @@ function init() {
       renderTiles();
       updateStreak();
       updateSurface();
+      // depth bonus toast
+      if (state.depthBonus && (!prevState || !prevState.depthBonus || state.depthBonus.time !== prevState.depthBonus.time)) {
+        const milestone = state.depthBonus.depth / 50;
+        const bonusText = milestone % 2 === 0 ? '+1 工具耐久！' : '鍍金護盾！';
+        const toast = el('div', 'milestone-toast', `🎁 深度 ${state.depthBonus.depth} 獎勵：${bonusText}`);
+        if (modalRoot) {
+          modalRoot.appendChild(toast);
+          requestAnimationFrame(() => toast.classList.add('visible'));
+          setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.parentNode && toast.parentNode.removeChild(toast), 250); }, 1800);
+        }
+        sfxMilestone();
+      }
       // milestone celebrations
       if (state.alive && state.depth > lastMilestone) {
         for (const m of MILESTONES) {

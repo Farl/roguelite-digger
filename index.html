@@ -744,12 +744,46 @@
 <body>
   <div id="app"></div>
 
-  <script type="importmap">
-    {
-      "imports": {
-      }
+  <script type="module">
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('engine');
+    const fromStorage = localStorage.getItem('yam_engine_mode_v1');
+    const ROLLOUT_PERCENT = 5;
+
+    const rolloutIdKey = 'yam_rollout_id_v1';
+    let rolloutId = localStorage.getItem(rolloutIdKey);
+    if (!rolloutId) {
+      rolloutId = String(Math.floor(Math.random() * 10000));
+      try { localStorage.setItem(rolloutIdKey, rolloutId); } catch {}
+    }
+    const rolloutBucket = Number(rolloutId) % 100;
+    const fromRollout = rolloutBucket < ROLLOUT_PERCENT ? 'phaser' : 'dom';
+
+    const engine = fromQuery || fromStorage || fromRollout || 'dom';
+
+    if (fromQuery === 'dom' || fromQuery === 'phaser') {
+      try { localStorage.setItem('yam_engine_mode_v1', fromQuery); } catch {}
+    }
+
+    if (engine === 'phaser') {
+      const phaserScript = document.createElement('script');
+      phaserScript.src = 'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js';
+      phaserScript.onload = () => {
+        import('./phaser-main.js').catch(() => {
+          import('./main.js');
+          console.warn('[engine] phaser module failed, fallback to dom');
+        });
+      };
+      phaserScript.onerror = () => {
+        import('./main.js');
+        console.warn('[engine] phaser script failed, fallback to dom');
+      };
+      document.body.appendChild(phaserScript);
+      console.info('[engine] phaser', { rolloutPercent: ROLLOUT_PERCENT, rolloutBucket });
+    } else {
+      import('./main.js');
+      console.info('[engine] dom', { rolloutPercent: ROLLOUT_PERCENT, rolloutBucket });
     }
   </script>
-  <script type="module" src="./main.js"></script>
 </body>
 </html>

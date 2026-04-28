@@ -1,0 +1,49 @@
+{
+  "pack": "minipack-v5",
+  "workflow": "gpt-image-2-cli + custom-postprocess",
+  "generatedOn": "2026-04-29",
+  "targetEngine": "phaser",
+  "files": [
+    "worker.png",
+    "tile_dirt.png",
+    "tile_stone.png",
+    "tile_diamond.png",
+    "tile_event.png",
+    "tile_puzzle.png",
+    "tile_empty.png"
+  ],
+  "sources": {
+    "worker": {
+      "rawSheet": "assets/sprite-forge/minipack/build_v5/raw/worker-raw.png",
+      "processedDir": "assets/sprite-forge/minipack/build_v5/worker",
+      "sheet": "2x2",
+      "cellSize": 64,
+      "fitScale": 0.9,
+      "align": "feet",
+      "componentMode": "largest"
+    },
+    "tiles": {
+      "rawSheet": "assets/sprite-forge/minipack/build_v5/raw/tiles-raw.png",
+      "processedDir": "assets/sprite-forge/minipack/build_v5/tiles",
+      "sheet": "2x3",
+      "cellSize": 96,
+      "fitScale": 0.93,
+      "align": "center",
+      "componentMode": "largest"
+    }
+  },
+  "integration": {
+    "sceneFile": "phaser-main.js",
+    "worker": {
+      "loadedAs": "spritesheet",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animation": "worker-walk"
+    },
+    "tiles": {
+      "loadedAs": "images",
+      "renderScale": "48x48"
+    }
+  },
+  "notes": "Premium v3 art pass: high-res authored raw sheets postprocessed by generate2dsprite and published to stable Phaser filenames."
+}

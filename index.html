@@ -759,7 +759,7 @@
     const rolloutBucket = Number(rolloutId) % 100;
     const fromRollout = rolloutBucket < ROLLOUT_PERCENT ? 'phaser' : 'dom';
 
-    const engine = fromQuery || fromStorage || fromRollout || 'dom';
+    const engine = fromQuery || fromStorage || fromRollout || 'phaser';
 
     if (fromQuery === 'dom' || fromQuery === 'phaser') {
       try { localStorage.setItem('yam_engine_mode_v1', fromQuery); } catch {}
@@ -767,7 +767,7 @@
 
     if (engine === 'phaser') {
       const phaserScript = document.createElement('script');
-      phaserScript.src = 'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js';
+      phaserScript.src = 'https://cdn.jsdelivr.net/npm/phaser/dist/phaser.min.js';
       phaserScript.onload = () => {
         import('./phaser-main.js').catch((err) => {
           import('./main.js');

@@ -84,6 +84,8 @@ class DiggerScene extends Phaser.Scene {
     // ── Background
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x1a1009);
 
+    this._createUITextures();
+
     // ── HUD row 1: depth / tools / best
     const hudStyle = { fontFamily: FONT_FAMILY, fontSize: '20px', color: '#f8f3e6', backgroundColor: '#00000055', padding: { x: 8, y: 4 } };
     this.depthText = this.add.text(12,  12, '深度: 0', hudStyle);
@@ -147,68 +149,42 @@ class DiggerScene extends Phaser.Scene {
     kb.on('keydown-C',     () => this._showCollectionModal());
     kb.on('keydown-H',     () => this._showHelpModal());
 
-    // ── Bottom button bar (improved layout)
+    // ── Bottom button bar (graphical)
     const btnY = HEIGHT - 36;
-    const btnSpacing = 58;
-    let btnX = 12;
-
-    this.pauseBtn = this.add.text(btnX, btnY, '暫停', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
-    this.pauseBtn.on('pointerdown', () => {
-      if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause();
-    });
-
-    btnX += btnSpacing;
-    this.muteBtn = this.add.text(btnX, btnY, _muted ? '音關' : '音開', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
-    this.muteBtn.on('pointerdown', () => {
-      _muted = !_muted;
-      saveMute(_muted);
-      this.muteBtn.setText(_muted ? '音關' : '音開');
-    });
-
-    btnX += btnSpacing;
-    this.helpBtn = this.add.text(btnX, btnY, '說明', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
+    const btnCenters = [40, 120, 200, 280, 360, 440];
+    const btnW = 72, btnH = 28;
+    const mkBtn = (cx, label) => {
+      const g = this.add.graphics();
+      g.fillStyle(0x1c1008, 1);
+      g.fillRoundedRect(cx - btnW / 2, btnY - btnH / 2, btnW, btnH, 5);
+      g.lineStyle(1.5, 0x5a4020, 1);
+      g.strokeRoundedRect(cx - btnW / 2 + 1, btnY - btnH / 2 + 1, btnW - 2, btnH - 2, 5);
+      const t = this.add.text(cx, btnY, label, { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#d8c49a' })
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      t.on('pointerover', () => t.setColor('#ffe58a'));
+      t.on('pointerout',  () => t.setColor('#d8c49a'));
+      return t;
+    };
+    this.pauseBtn = mkBtn(btnCenters[0], '暫停');
+    this.pauseBtn.on('pointerdown', () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
+    this.muteBtn = mkBtn(btnCenters[1], _muted ? '音關' : '音開');
+    this.muteBtn.on('pointerdown', () => { _muted = !_muted; saveMute(_muted); this.muteBtn.setText(_muted ? '音關' : '音開'); });
+    this.helpBtn = mkBtn(btnCenters[2], '說明');
     this.helpBtn.on('pointerdown', () => this._showHelpModal());
-
-    btnX += btnSpacing;
-    this.collectionBtn = this.add.text(btnX, btnY, '收藏', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
+    this.collectionBtn = mkBtn(btnCenters[3], '收藏');
     this.collectionBtn.on('pointerdown', () => this._showCollectionModal());
-
-    btnX += btnSpacing;
-    this.restartBtn = this.add.text(btnX, btnY, '重開', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
-    this.restartBtn.on('pointerdown', () => {
-      if (!this.logic) return;
-      this._showDifficultyModal(diff => this.logic.startRun(diff));
-    });
-
-    btnX += btnSpacing;
-    this.clearBtn = this.add.text(btnX, btnY, '清進度', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
-    }).setInteractive({ useHandCursor: true });
+    this.restartBtn = mkBtn(btnCenters[4], '重開');
+    this.restartBtn.on('pointerdown', () => { if (!this.logic) return; this._showDifficultyModal(diff => this.logic.startRun(diff)); });
+    this.clearBtn = mkBtn(btnCenters[5], '清進度');
     this.clearBtn.on('pointerdown', () => this._showClearProgressModal());
 
     this.relicText = this.add.text(12, 108, '', {
       fontFamily: FONT_FAMILY, fontSize: '12px', color: '#c8b87e'
     }).setDepth(5);
 
-    // ── Bottom info bar
-    this.infoText = this.add.text(12, HEIGHT - 22, '', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#8f7a5a'
+    // ── Bottom info bar (sits below buttons)
+    this.infoText = this.add.text(12, HEIGHT - 14, '', {
+      fontFamily: FONT_FAMILY, fontSize: '11px', color: '#8f7a5a'
     }).setDepth(5);
 
     // ── Modal layer (drawn last = on top)
@@ -238,9 +214,8 @@ class DiggerScene extends Phaser.Scene {
     const arr = [];
     for (let i = 0; i < 5; i++) {
       const baseY = this.gridTop + i * this.tileH;
-      const bg = this.add.rectangle(x, baseY, this.colW, this.tileH - 4, 0x2a170d, 1);
-      const sprite = this.add.image(x, baseY, 'tile_dirt').setDisplaySize(this.colW - 6, this.tileH - 10);
-      arr.push({ bg, sprite, baseY });
+      const sprite = this.add.image(x, baseY, 'tile_dirt').setDisplaySize(this.colW, this.tileH + 1);
+      arr.push({ sprite, baseY });
     }
     return arr;
   }
@@ -262,9 +237,8 @@ class DiggerScene extends Phaser.Scene {
   _playDigScroll() {
     const allTiles = [...this.leftTiles, ...this.rightTiles];
     for (const t of allTiles) {
-      t.bg.y = t.baseY + this.tileScrollOffset;
       t.sprite.y = t.baseY + this.tileScrollOffset;
-      this.tweens.add({ targets: [t.bg, t.sprite], y: t.baseY, duration: 130, ease: 'Cubic.Out' });
+      this.tweens.add({ targets: t.sprite, y: t.baseY, duration: 130, ease: 'Cubic.Out' });
     }
     const workerBaseY = this.gridTop - 26;
     this.worker.y = workerBaseY + 10;
@@ -322,7 +296,7 @@ class DiggerScene extends Phaser.Scene {
       const panelH = 200;
       const x = WIDTH / 2;
       const y = HEIGHT / 2;
-      const bg = this.add.rectangle(x, y, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xe05050);
+      const bg = this._makePanel(x, y, panelW, panelH, 'ui_panel_red');
       this.uiModalOpen = true;
       const title = this.add.text(x, y - 74, '清除所有進度？', { fontFamily: FONT_FAMILY, fontSize: '20px', color: '#ffe58a' }).setOrigin(0.5, 0);
       const sub = this.add.text(x, y - 44, '包含拼圖與遺物解鎖。此動作無法復原。', { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#a09070' }).setOrigin(0.5, 0);
@@ -342,6 +316,36 @@ class DiggerScene extends Phaser.Scene {
 
     if (this.state?.alive && !this.state?.inEvent) this._withModalPause(show);
     else show();
+  }
+
+  _createUITextures() {
+    const makePanel = (key, borderColor, innerGlow) => {
+      if (this.textures.exists(key)) return;
+      const g = this.make.graphics({ add: false });
+      const w = 80, h = 80, r = 12;
+      g.fillStyle(0x130b04, 1);
+      g.fillRoundedRect(0, 0, w, h, r);
+      g.lineStyle(3, borderColor, 1);
+      g.strokeRoundedRect(1.5, 1.5, w - 3, h - 3, r);
+      g.lineStyle(1, innerGlow, 0.35);
+      g.strokeRoundedRect(5, 5, w - 10, h - 10, r - 3);
+      g.generateTexture(key, w, h);
+      g.destroy();
+    };
+    makePanel('ui_panel',     0xb8851a, 0xf6cf4a);
+    makePanel('ui_panel_red', 0xb03028, 0xe05050);
+  }
+
+  _makePanel(x, y, w, h, variant = 'ui_panel') {
+    return this.add.nineslice(x, y, variant, undefined, w, h, 12, 12, 12, 12);
+  }
+
+  _drawCard(g, x, y, w, h, hi) {
+    g.clear();
+    g.fillStyle(hi ? 0x4c3118 : 0x2a1808, 1);
+    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+    g.lineStyle(2, hi ? 0xf6cf4a : 0x7a5a2a, 1);
+    g.strokeRoundedRect(x - w / 2 + 1, y - h / 2 + 1, w - 2, h - 2, 8);
   }
 
   _relicDescriptions() {
@@ -373,7 +377,7 @@ class DiggerScene extends Phaser.Scene {
       const panelX = WIDTH / 2;
       const panelY = HEIGHT / 2;
 
-      const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xf6cf4a);
+      const bg = this._makePanel(panelX, panelY, panelW, panelH);
       this.modalLayer.add(bg);
 
       let y = panelY - panelH / 2 + 16;
@@ -466,7 +470,7 @@ class DiggerScene extends Phaser.Scene {
       const panelX = WIDTH / 2;
       const panelY = HEIGHT / 2;
 
-      const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xf6cf4a);
+      const bg = this._makePanel(panelX, panelY, panelW, panelH);
       this.modalLayer.add(bg);
 
       let y = panelY - panelH / 2 + 18;
@@ -513,7 +517,6 @@ class DiggerScene extends Phaser.Scene {
   _renderTiles(col, tiles) {
     for (let i = 0; i < 5; i++) {
       const cfg = this._tileStyle(tiles[i]);
-      col[i].bg.setFillStyle(cfg.color);
       col[i].sprite.setTexture(cfg.texture).setAlpha(cfg.alpha);
     }
   }
@@ -711,7 +714,7 @@ class DiggerScene extends Phaser.Scene {
     const panelX = WIDTH / 2;
     const panelY = HEIGHT / 2;
 
-    const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.92).setStrokeStyle(2, 0xf6cf4a);
+    const bg = this._makePanel(panelX, panelY, panelW, panelH);
     const title = this.add.text(panelX, panelY - 120, eventData.title || '地底事件', { fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffe58a' }).setOrigin(0.5, 0);
     const desc = this.add.text(panelX, panelY - 84, eventData.desc || '', {
       fontFamily: FONT_FAMILY, fontSize: '15px', color: '#f8f3e6', wordWrap: { width: panelW - 40 }
@@ -778,18 +781,25 @@ class DiggerScene extends Phaser.Scene {
       return;
     }
 
-    for (let i = 0; i < this.eventOptions.length; i++) {
+    const numCards = Math.min(this.eventOptions.length, 3);
+    const cW = 126, cH = 128, cGap = 8;
+    const totalCW = numCards * cW + (numCards - 1) * cGap;
+    const c0X = panelX - totalCW / 2 + cW / 2;
+    const cY = panelY + 26;
+    for (let i = 0; i < numCards; i++) {
       const opt = this.eventOptions[i];
-      const y = panelY - 10 + i * 60;
-      const btn = this.add.text(panelX, y, `${i + 1}. ${opt.title} - ${opt.desc}`, {
-        fontFamily: FONT_FAMILY, fontSize: '15px', color: '#f8f3e6',
-        backgroundColor: '#3a2510', padding: { x: 12, y: 8 },
-        wordWrap: { width: panelW - 60 }
-      }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setStyle({ color: '#ffe58a' }));
-      btn.on('pointerout', () => btn.setStyle({ color: '#f8f3e6' }));
-      btn.on('pointerdown', () => this._handleEventChoice(i));
-      this.modalLayer.add(btn);
+      const cx = c0X + i * (cW + cGap);
+      const cg = this.add.graphics();
+      this._drawCard(cg, cx, cY, cW, cH, false);
+      const hz = this.add.rectangle(cx, cY, cW, cH, 0x000000, 0).setInteractive({ useHandCursor: true });
+      const numT = this.add.text(cx, cY - 54, `${i + 1}`, { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#706050' }).setOrigin(0.5);
+      const ttl = this.add.text(cx, cY - 38, opt.title, { fontFamily: FONT_FAMILY, fontSize: '15px', color: '#ffe58a', align: 'center', wordWrap: { width: cW - 14 } }).setOrigin(0.5, 0);
+      const dsc = this.add.text(cx, cY + 8, opt.desc, { fontFamily: FONT_FAMILY, fontSize: '11px', color: '#c8b87e', align: 'center', wordWrap: { width: cW - 14 } }).setOrigin(0.5, 0);
+      const ii = i;
+      hz.on('pointerover', () => { this._drawCard(cg, cx, cY, cW, cH, true); ttl.setColor('#ffffff'); });
+      hz.on('pointerout',  () => { this._drawCard(cg, cx, cY, cW, cH, false); ttl.setColor('#ffe58a'); });
+      hz.on('pointerdown', () => this._handleEventChoice(ii));
+      this.modalLayer.add([cg, hz, numT, ttl, dsc]);
     }
   }
 
@@ -836,7 +846,7 @@ class DiggerScene extends Phaser.Scene {
     const panelX = WIDTH / 2;
     let   curY   = HEIGHT / 2 - 160;
 
-    const bg = this.add.rectangle(panelX, HEIGHT / 2, panelW, 420, 0x000000, 0.92).setStrokeStyle(2, 0xe05050);
+    const bg = this._makePanel(panelX, HEIGHT / 2, panelW, 420, 'ui_panel_red');
     this.modalLayer.add(bg);
 
     const addLine = (text, style = {}) => {
@@ -894,7 +904,7 @@ class DiggerScene extends Phaser.Scene {
     const panelX = WIDTH / 2;
     const panelY = HEIGHT / 2 - 60;
 
-    const bg    = this.add.rectangle(panelX, panelY, panelW, 260, 0x000000, 0.92).setStrokeStyle(2, 0xf6cf4a);
+    const bg    = this._makePanel(panelX, panelY, panelW, 260);
     const title = this.add.text(panelX, panelY - 110, '選擇難度', { fontFamily: FONT_FAMILY, fontSize: '26px', color: '#ffe58a' }).setOrigin(0.5, 0);
     const sub   = this.add.text(panelX, panelY - 76, '難度會影響初始耐久與危險格機率', { fontFamily: FONT_FAMILY, fontSize: '13px', color: '#a09070' }).setOrigin(0.5, 0);
     this.modalLayer.add([bg, title, sub]);
@@ -912,7 +922,9 @@ class DiggerScene extends Phaser.Scene {
     for (let i = 0; i < diffs.length; i++) {
       const d = diffs[i];
       const x = startX + i * (cardW + gap);
-      const card = this.add.rectangle(x, cardY, cardW, cardH, 0x3a2510).setStrokeStyle(2, 0x7a5a2a).setInteractive({ useHandCursor: true });
+      const cardG = this.add.graphics();
+      this._drawCard(cardG, x, cardY, cardW, cardH, false);
+      const hitZone = this.add.rectangle(x, cardY, cardW, cardH, 0x000000, 0).setInteractive({ useHandCursor: true });
       const label = this.add.text(x, cardY - 28, d.label, {
         fontFamily: FONT_FAMILY, fontSize: '22px', color: '#f8f3e6', align: 'center'
       }).setOrigin(0.5);
@@ -920,14 +932,10 @@ class DiggerScene extends Phaser.Scene {
         fontFamily: FONT_FAMILY, fontSize: '13px', color: '#c8b87e', align: 'center',
         wordWrap: { width: cardW - 16 }
       }).setOrigin(0.5);
-      card.on('pointerover', () => { card.setFillStyle(0x4c3118); label.setColor('#ffe58a'); });
-      card.on('pointerout', () => { card.setFillStyle(0x3a2510); label.setColor('#f8f3e6'); });
-      card.on('pointerdown', () => {
-        this.uiModalOpen = false;
-        this.modalLayer.removeAll(true);
-        onSelect(d.key);
-      });
-      this.modalLayer.add([card, label, subLabel]);
+      hitZone.on('pointerover', () => { this._drawCard(cardG, x, cardY, cardW, cardH, true); label.setColor('#ffe58a'); });
+      hitZone.on('pointerout',  () => { this._drawCard(cardG, x, cardY, cardW, cardH, false); label.setColor('#f8f3e6'); });
+      hitZone.on('pointerdown', () => { this.uiModalOpen = false; this.modalLayer.removeAll(true); onSelect(d.key); });
+      this.modalLayer.add([cardG, hitZone, label, subLabel]);
     }
   }
 }

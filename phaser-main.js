@@ -141,9 +141,23 @@ class DiggerScene extends Phaser.Scene {
     kb.on('keydown-C',     () => this._showCollectionModal());
     kb.on('keydown-H',     () => this._showHelpModal());
 
-    // ── Mute button
-    this.muteBtn = this.add.text(WIDTH - 48, HEIGHT - 38, _muted ? '🔇' : '🔊', {
-      fontFamily: 'Arial', fontSize: '22px', backgroundColor: '#00000055'
+    // ── Bottom button bar (improved layout)
+    const btnY = HEIGHT - 36;
+    const btnSpacing = 58;
+    let btnX = 12;
+
+    this.pauseBtn = this.add.text(btnX, btnY, '暫停', {
+      fontFamily: 'Arial', fontSize: '12px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
+    }).setInteractive({ useHandCursor: true });
+    this.pauseBtn.on('pointerdown', () => {
+      if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause();
+    });
+
+    btnX += btnSpacing;
+    this.muteBtn = this.add.text(btnX, btnY, _muted ? '🔇' : '🔊', {
+      fontFamily: 'Arial', fontSize: '16px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
     }).setInteractive({ useHandCursor: true });
     this.muteBtn.on('pointerdown', () => {
       _muted = !_muted;
@@ -151,40 +165,36 @@ class DiggerScene extends Phaser.Scene {
       this.muteBtn.setText(_muted ? '🔇' : '🔊');
     });
 
-    this.helpBtn = this.add.text(12, HEIGHT - 36, '說明', {
+    btnX += btnSpacing;
+    this.helpBtn = this.add.text(btnX, btnY, '？', {
       fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
     }).setInteractive({ useHandCursor: true });
     this.helpBtn.on('pointerdown', () => this._showHelpModal());
 
-    this.pauseBtn = this.add.text(62, HEIGHT - 36, '暫停', {
-      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    btnX += btnSpacing;
+    this.collectionBtn = this.add.text(btnX, btnY, '拼圖', {
+      fontFamily: 'Arial', fontSize: '12px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
     }).setInteractive({ useHandCursor: true });
-    this.pauseBtn.on('pointerdown', () => {
-      if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause();
-    });
+    this.collectionBtn.on('pointerdown', () => this._showCollectionModal());
 
-    this.restartBtn = this.add.text(112, HEIGHT - 36, '重開', {
-      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    btnX += btnSpacing;
+    this.restartBtn = this.add.text(btnX, btnY, '重開', {
+      fontFamily: 'Arial', fontSize: '12px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
     }).setInteractive({ useHandCursor: true });
     this.restartBtn.on('pointerdown', () => {
       if (!this.logic) return;
       this._showDifficultyModal(diff => this.logic.startRun(diff));
     });
 
-    this.clearBtn = this.add.text(162, HEIGHT - 36, '清進度', {
-      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    btnX += btnSpacing;
+    this.clearBtn = this.add.text(btnX, btnY, '清進度', {
+      fontFamily: 'Arial', fontSize: '12px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 6, y: 3 }
     }).setInteractive({ useHandCursor: true });
     this.clearBtn.on('pointerdown', () => this._showClearProgressModal());
-
-    this.collectionBtn = this.add.text(228, HEIGHT - 36, '收藏', {
-      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
-      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
-    }).setInteractive({ useHandCursor: true });
-    this.collectionBtn.on('pointerdown', () => this._showCollectionModal());
 
     this.relicText = this.add.text(12, 108, '', {
       fontFamily: 'Arial', fontSize: '11px', color: '#c8b87e'
@@ -198,7 +208,9 @@ class DiggerScene extends Phaser.Scene {
     // ── Modal layer (drawn last = on top)
     this.modalLayer = this.add.container(0, 0).setDepth(100);
 
-    if (!loadHintDismissed()) this._showHintBar();
+    if (!loadHintDismissed()) {
+      this.time.delayedCall(300, () => this._showHintBar());
+    }
 
     // ── Init game logic
     this.logic = new Game(
@@ -288,17 +300,17 @@ class DiggerScene extends Phaser.Scene {
     const show = () => {
       this.modalLayer.removeAll(true);
       const panelW = WIDTH - 70;
-      const panelH = 180;
+      const panelH = 200;
       const x = WIDTH / 2;
       const y = HEIGHT / 2;
       const bg = this.add.rectangle(x, y, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xe05050);
-      const title = this.add.text(x, y - 66, '清除所有進度？', { fontFamily: 'Arial', fontSize: '22px', color: '#ffe58a' }).setOrigin(0.5, 0);
-      const sub = this.add.text(x, y - 34, '包含拼圖與遺物解鎖。此動作無法復原。', { fontFamily: 'Arial', fontSize: '12px', color: '#a09070' }).setOrigin(0.5, 0);
-      const yes = this.add.text(x - 64, y + 30, '確認', {
-        fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', backgroundColor: '#5a2418', padding: { x: 10, y: 5 }
+      const title = this.add.text(x, y - 74, '清除所有進度？', { fontFamily: 'Arial', fontSize: '20px', color: '#ffe58a' }).setOrigin(0.5, 0);
+      const sub = this.add.text(x, y - 44, '包含拼圖與遺物解鎖。此動作無法復原。', { fontFamily: 'Arial', fontSize: '12px', color: '#a09070' }).setOrigin(0.5, 0);
+      const yes = this.add.text(x - 60, y + 30, '確認', {
+        fontFamily: 'Arial', fontSize: '14px', color: '#f8f3e6', backgroundColor: '#5a2418', padding: { x: 12, y: 5 }
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      const no = this.add.text(x + 64, y + 30, '取消', {
-        fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', backgroundColor: '#2b1b11', padding: { x: 10, y: 5 }
+      const no = this.add.text(x + 60, y + 30, '取消', {
+        fontFamily: 'Arial', fontSize: '14px', color: '#f8f3e6', backgroundColor: '#2b1b11', padding: { x: 12, y: 5 }
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       yes.on('pointerdown', () => {
         if (this.logic?.clearProgress) this.logic.clearProgress();

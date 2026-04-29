@@ -25,18 +25,18 @@
       --transition-fast: 0.16s ease-out;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#e6ddcf; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#0f0906; }
     body { display:flex; justify-content:center; align-items:center; }
     #app {
       width:100%;
       height:100%;
       max-width:480px;
       margin:auto;
-      background:linear-gradient(180deg,#f6efe1 0%,#e3d4b5 60%,#d0b48a 100%);
+      background:linear-gradient(180deg,#2b1b11 0%,#1b100a 60%,#120a06 100%);
       display:flex;
       flex-direction:column;
-      box-shadow:0 10px 30px rgba(0,0,0,0.35);
-      border-radius:18px;
+      box-shadow:none;
+      border-radius:0;
       overflow:hidden;
     }
     .hud {
@@ -747,19 +747,7 @@
   <script type="module">
     const params = new URLSearchParams(window.location.search);
     const fromQuery = params.get('engine');
-    const fromStorage = localStorage.getItem('yam_engine_mode_v1');
-    const ROLLOUT_PERCENT = 5;
-
-    const rolloutIdKey = 'yam_rollout_id_v1';
-    let rolloutId = localStorage.getItem(rolloutIdKey);
-    if (!rolloutId) {
-      rolloutId = String(Math.floor(Math.random() * 10000));
-      try { localStorage.setItem(rolloutIdKey, rolloutId); } catch {}
-    }
-    const rolloutBucket = Number(rolloutId) % 100;
-    const fromRollout = rolloutBucket < ROLLOUT_PERCENT ? 'phaser' : 'dom';
-
-    const engine = fromQuery || fromStorage || fromRollout || 'phaser';
+    const engine = fromQuery === 'dom' ? 'dom' : 'phaser';
 
     if (fromQuery === 'dom' || fromQuery === 'phaser') {
       try { localStorage.setItem('yam_engine_mode_v1', fromQuery); } catch {}
@@ -779,10 +767,10 @@
         console.warn('[engine] phaser script failed, fallback to dom');
       };
       document.body.appendChild(phaserScript);
-      console.info('[engine] phaser', { rolloutPercent: ROLLOUT_PERCENT, rolloutBucket });
+      console.info('[engine] phaser');
     } else {
       import('./main.js');
-      console.info('[engine] dom', { rolloutPercent: ROLLOUT_PERCENT, rolloutBucket });
+      console.info('[engine] dom');
     }
   </script>
 </body>

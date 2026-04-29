@@ -1,5 +1,10 @@
 import { Game } from './game.js';
-import { loadMute, saveMute, loadBestScore, saveBestScore, addLeaderboardEntry } from './storage.js';
+import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore, addLeaderboardEntry } from './storage.js';
+
+const Phaser = globalThis.Phaser;
+if (!Phaser) {
+  throw new Error('Phaser global not found. Ensure phaser.min.js is loaded before phaser-main.js.');
+}
 
 const WIDTH  = 480;
 const HEIGHT = 800;
@@ -52,6 +57,11 @@ class DiggerScene extends Phaser.Scene {
     this.bestScore      = 0;
     this.toasts         = [];
     this.lastPuzzleCount = null;
+    this.lastManualSide = 'left';
+    this._modalPausedByUI = false;
+    this.eventMode = 'choice';
+    this.rouletteTimer = null;
+    this.hintBar = null;
   }
 
   preload() {
@@ -76,6 +86,10 @@ class DiggerScene extends Phaser.Scene {
     this.depthText = this.add.text(12,  12, '深度: 0', hudStyle);
     this.toolsText = this.add.text(160, 12, '工具: 0', hudStyle);
     this.bestText  = this.add.text(318, 12, '最佳: 0', hudStyle);
+
+    // Tool durability meter (same thresholds as DOM)
+    this.toolMeterTrack = this.add.rectangle(186, 39, 90, 4, 0x1b120a).setOrigin(0, 0);
+    this.toolMeterFill = this.add.rectangle(186, 39, 90, 4, 0x52d48a).setOrigin(0, 0);
 
     // ── HUD row 2: score + streak
     const subStyle = { fontFamily: 'Arial', fontSize: '15px', color: '#c8b87e', backgroundColor: '#00000033', padding: { x: 6, y: 2 } };
@@ -115,12 +129,17 @@ class DiggerScene extends Phaser.Scene {
     kb.on('keydown-A',     () => this._dig('left'));
     kb.on('keydown-RIGHT', () => this._dig('right'));
     kb.on('keydown-D',     () => this._dig('right'));
+    kb.on('keydown-W',     () => this._dig(this.lastManualSide));
+    kb.on('keydown-S',     () => this._dig(this.lastManualSide));
+    kb.on('keydown-SPACE', () => this._dig(this.lastManualSide));
     kb.on('keydown-ONE',   () => this._handleEventChoice(0));
     kb.on('keydown-TWO',   () => this._handleEventChoice(1));
     kb.on('keydown-THREE', () => this._handleEventChoice(2));
     kb.on('keydown-R',     () => { if (this.state && !this.state.alive) this._tryRestartOverlay(); });
     kb.on('keydown-P',     () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
     kb.on('keydown-ESC',   () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
+    kb.on('keydown-C',     () => this._showCollectionModal());
+    kb.on('keydown-H',     () => this._showHelpModal());
 
     // ── Mute button
     this.muteBtn = this.add.text(WIDTH - 48, HEIGHT - 38, _muted ? '🔇' : '🔊', {
@@ -132,6 +151,45 @@ class DiggerScene extends Phaser.Scene {
       this.muteBtn.setText(_muted ? '🔇' : '🔊');
     });
 
+    this.helpBtn = this.add.text(12, HEIGHT - 36, '說明', {
+      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    }).setInteractive({ useHandCursor: true });
+    this.helpBtn.on('pointerdown', () => this._showHelpModal());
+
+    this.pauseBtn = this.add.text(62, HEIGHT - 36, '暫停', {
+      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    }).setInteractive({ useHandCursor: true });
+    this.pauseBtn.on('pointerdown', () => {
+      if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause();
+    });
+
+    this.restartBtn = this.add.text(112, HEIGHT - 36, '重開', {
+      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    }).setInteractive({ useHandCursor: true });
+    this.restartBtn.on('pointerdown', () => {
+      if (!this.logic) return;
+      this._showDifficultyModal(diff => this.logic.startRun(diff));
+    });
+
+    this.clearBtn = this.add.text(162, HEIGHT - 36, '清進度', {
+      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    }).setInteractive({ useHandCursor: true });
+    this.clearBtn.on('pointerdown', () => this._showClearProgressModal());
+
+    this.collectionBtn = this.add.text(228, HEIGHT - 36, '收藏', {
+      fontFamily: 'Arial', fontSize: '13px', color: '#f8f3e6',
+      backgroundColor: '#00000055', padding: { x: 7, y: 4 }
+    }).setInteractive({ useHandCursor: true });
+    this.collectionBtn.on('pointerdown', () => this._showCollectionModal());
+
+    this.relicText = this.add.text(12, 108, '', {
+      fontFamily: 'Arial', fontSize: '11px', color: '#c8b87e'
+    }).setDepth(5);
+
     // ── Bottom info bar
     this.infoText = this.add.text(12, HEIGHT - 22, '', {
       fontFamily: 'Arial', fontSize: '11px', color: '#604830'
@@ -139,6 +197,8 @@ class DiggerScene extends Phaser.Scene {
 
     // ── Modal layer (drawn last = on top)
     this.modalLayer = this.add.container(0, 0).setDepth(100);
+
+    if (!loadHintDismissed()) this._showHintBar();
 
     // ── Init game logic
     this.logic = new Game(
@@ -175,9 +235,232 @@ class DiggerScene extends Phaser.Scene {
   _dig(side) {
     if (!this.logic || !this.state?.alive || this.state?.inEvent || this.state?.paused) return;
     if (this.state.autoDigActive) { this.logic.switchAutoSide(side); this._placeWorker(side); return; }
+    this.lastManualSide = side;
     this._placeWorker(side);
     sfx.dig();
     this.logic.step(side);
+  }
+
+  _withModalPause(fn) {
+    if (!this.logic || !this.state?.alive || this.state?.inEvent) return;
+    this._modalPausedByUI = !this.state.paused;
+    if (this._modalPausedByUI) this.logic.setPaused(true);
+    fn();
+  }
+
+  _closeUIModal() {
+    this._clearRouletteTimer();
+    this.modalLayer.removeAll(true);
+    if (this._modalPausedByUI && this.logic && this.state?.alive && this.state?.paused) {
+      this.logic.setPaused(false);
+    }
+    this._modalPausedByUI = false;
+  }
+
+  _clearRouletteTimer() {
+    if (this.rouletteTimer) {
+      this.rouletteTimer.remove(false);
+      this.rouletteTimer = null;
+    }
+  }
+
+  _showHintBar() {
+    const y = HEIGHT - 74;
+    const bar = this.add.container(0, 0).setDepth(40);
+    const bg = this.add.rectangle(WIDTH / 2, y, WIDTH - 20, 32, 0x000000, 0.72).setStrokeStyle(1, 0x5a4a32);
+    const text = this.add.text(14, y - 10, '點左半邊挖左、右半邊挖右。鍵盤：A/←、D/→、P 暫停。', {
+      fontFamily: 'Arial', fontSize: '11px', color: '#f1ddba'
+    });
+    const okBtn = this.add.text(WIDTH - 62, y - 10, '知道了', {
+      fontFamily: 'Arial', fontSize: '11px', color: '#f8f3e6',
+      backgroundColor: '#3a2510', padding: { x: 6, y: 3 }
+    }).setInteractive({ useHandCursor: true });
+    okBtn.on('pointerdown', () => {
+      saveHintDismissed();
+      bar.destroy(true);
+      this.hintBar = null;
+    });
+    bar.add([bg, text, okBtn]);
+    this.hintBar = bar;
+  }
+
+  _showClearProgressModal() {
+    const show = () => {
+      this.modalLayer.removeAll(true);
+      const panelW = WIDTH - 70;
+      const panelH = 180;
+      const x = WIDTH / 2;
+      const y = HEIGHT / 2;
+      const bg = this.add.rectangle(x, y, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xe05050);
+      const title = this.add.text(x, y - 66, '清除所有進度？', { fontFamily: 'Arial', fontSize: '22px', color: '#ffe58a' }).setOrigin(0.5, 0);
+      const sub = this.add.text(x, y - 34, '包含拼圖與遺物解鎖。此動作無法復原。', { fontFamily: 'Arial', fontSize: '12px', color: '#a09070' }).setOrigin(0.5, 0);
+      const yes = this.add.text(x - 64, y + 30, '確認', {
+        fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', backgroundColor: '#5a2418', padding: { x: 10, y: 5 }
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const no = this.add.text(x + 64, y + 30, '取消', {
+        fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', backgroundColor: '#2b1b11', padding: { x: 10, y: 5 }
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      yes.on('pointerdown', () => {
+        if (this.logic?.clearProgress) this.logic.clearProgress();
+        this._closeUIModal();
+      });
+      no.on('pointerdown', () => this._closeUIModal());
+      this.modalLayer.add([bg, title, sub, yes, no]);
+    };
+
+    if (this.state?.alive && !this.state?.inEvent) this._withModalPause(show);
+    else show();
+  }
+
+  _relicDescriptions() {
+    const unlocked = this.meta?.unlockedRelics || [];
+    const list = [];
+    if (unlocked.includes('extra_tool')) list.push('額外工具：每場開始時 +1 工具耐久');
+    if (unlocked.includes('stone_resist')) list.push('石頭護符：每場開始時 +1 工具耐久');
+    if (unlocked.includes('survey_aura')) list.push('探勘磁力：每場開始時最底兩層危險格轉泥土');
+    return list;
+  }
+
+  _buildPuzzleGroups() {
+    const groups = {};
+    for (const p of (this.meta?.puzzlePieces || [])) {
+      const key = `${p.id}_${p.size}`;
+      if (!groups[key]) groups[key] = new Set();
+      groups[key].add(p.index);
+    }
+    return groups;
+  }
+
+  _showCollectionModal() {
+    this._withModalPause(() => {
+      this.modalLayer.removeAll(true);
+
+      const panelW = WIDTH - 44;
+      const panelH = 560;
+      const panelX = WIDTH / 2;
+      const panelY = HEIGHT / 2;
+
+      const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xf6cf4a);
+      this.modalLayer.add(bg);
+
+      let y = panelY - panelH / 2 + 16;
+      const addLine = (text, style = {}, center = false) => {
+        const t = this.add.text(center ? panelX : panelX - panelW / 2 + 16, y, text, {
+          fontFamily: 'Arial', fontSize: '14px', color: '#f8f3e6',
+          wordWrap: { width: panelW - 32 },
+          ...style
+        }).setOrigin(center ? 0.5 : 0, 0);
+        this.modalLayer.add(t);
+        y += (t.height || 18) + 6;
+        return t;
+      };
+
+      addLine('收藏一覽', { fontSize: '24px', color: '#ffe58a' }, true);
+      const runs = this.meta?.runs ?? 0;
+      const best = this.state?.bestDepth ?? 0;
+      addLine(`遊戲數：${runs}　最佳深度：${best}`, { fontSize: '12px', color: '#c8b87e' }, true);
+      y += 2;
+
+      addLine('遺物', { fontSize: '16px', color: '#f6cf4a' });
+      const relics = this._relicDescriptions();
+      if (relics.length === 0) addLine('目前還沒有解鎖任何遺物', { fontSize: '13px', color: '#a09070' });
+      for (const r of relics) addLine(`・${r}`, { fontSize: '13px', color: '#f8f3e6' });
+
+      y += 4;
+      addLine('拼圖', { fontSize: '16px', color: '#f6cf4a' });
+      addLine('每到 20/40/60... 層有機會拿到拼圖；同張集滿後轉為永久遺物。', { fontSize: '12px', color: '#a09070' });
+
+      const groups = this._buildPuzzleGroups();
+      const keys = Object.keys(groups);
+      if (keys.length === 0) {
+        addLine('目前還沒有拼圖碎片。', { fontSize: '13px', color: '#a09070' });
+      } else {
+        for (const key of keys) {
+          const [id, sizeRaw] = key.split('_');
+          const size = Number(sizeRaw);
+          const got = groups[key];
+          const needed = size === 2 ? 4 : 9;
+          const relicName = size === 3
+            ? '石頭護符（開局 +1 工具耐久）'
+            : id === 'C'
+              ? '探勘磁力（最底危險格→泥土）'
+              : '額外工具（開局 +1 工具耐久）';
+          addLine(`拼圖 ${id}（${size}×${size}）：${got.size}/${needed} → ${relicName}`, { fontSize: '12px', color: '#f8f3e6' });
+
+          const cellSize = 16;
+          const gap = 3;
+          const gridW = size * cellSize + (size - 1) * gap;
+          const startX = panelX - panelW / 2 + 16;
+          for (let i = 0; i < needed; i++) {
+            const row = Math.floor(i / size);
+            const col = i % size;
+            const cx = startX + col * (cellSize + gap);
+            const cy = y + row * (cellSize + gap);
+            const owned = got.has(i);
+            const rect = this.add.rectangle(cx + cellSize / 2, cy + cellSize / 2, cellSize, cellSize, owned ? 0xb58429 : 0x4c2814)
+              .setOrigin(0.5)
+              .setStrokeStyle(1, owned ? 0xffe58a : 0x7a6644);
+            const n = this.add.text(cx + cellSize / 2, cy + cellSize / 2, String(i + 1), {
+              fontFamily: 'Arial', fontSize: '10px', color: owned ? '#fffbe6' : '#a09070'
+            }).setOrigin(0.5);
+            this.modalLayer.add([rect, n]);
+          }
+          y += Math.ceil(needed / size) * (cellSize + gap) + 10;
+          if (startX + gridW > panelX + panelW / 2) break;
+        }
+      }
+
+      const closeBtn = this.add.text(panelX, panelY + panelH / 2 - 34, '關閉', {
+        fontFamily: 'Arial', fontSize: '16px', color: '#ffe58a',
+        backgroundColor: '#2b1b11', padding: { x: 16, y: 7 }
+      }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+      closeBtn.on('pointerdown', () => this._closeUIModal());
+      this.modalLayer.add(closeBtn);
+    });
+  }
+
+  _showHelpModal() {
+    this._withModalPause(() => {
+      this.modalLayer.removeAll(true);
+
+      const panelW = WIDTH - 58;
+      const panelH = 330;
+      const panelX = WIDTH / 2;
+      const panelY = HEIGHT / 2;
+
+      const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.94).setStrokeStyle(2, 0xf6cf4a);
+      this.modalLayer.add(bg);
+
+      let y = panelY - panelH / 2 + 18;
+      const left = panelX - panelW / 2 + 16;
+      const add = (text, style = {}) => {
+        const t = this.add.text(left, y, text, {
+          fontFamily: 'Arial', fontSize: '14px', color: '#f8f3e6',
+          wordWrap: { width: panelW - 32 },
+          ...style
+        });
+        this.modalLayer.add(t);
+        y += (t.height || 18) + 8;
+      };
+
+      const title = this.add.text(panelX, y, '鍵盤操作', { fontFamily: 'Arial', fontSize: '24px', color: '#ffe58a' }).setOrigin(0.5, 0);
+      this.modalLayer.add(title);
+      y += (title.height || 28) + 12;
+
+      add('A / ←：挖左側');
+      add('D / →：挖右側');
+      add('W / S / 空白：沿上次方向挖');
+      add('1 / 2 / 3：事件時選擇選項');
+      add('P / Esc：暫停 / 繼續');
+      add('C：開啟收藏　H：開啟說明', { color: '#c8b87e' });
+
+      const closeBtn = this.add.text(panelX, panelY + panelH / 2 - 38, '關閉', {
+        fontFamily: 'Arial', fontSize: '16px', color: '#ffe58a',
+        backgroundColor: '#2b1b11', padding: { x: 16, y: 7 }
+      }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
+      closeBtn.on('pointerdown', () => this._closeUIModal());
+      this.modalLayer.add(closeBtn);
+    });
   }
 
   _tileStyle(type) {
@@ -247,7 +530,16 @@ class DiggerScene extends Phaser.Scene {
     if (this.infoText) {
       const runs = meta?.runs ?? 0;
       const pieces = currCount;
-      this.infoText.setText(`遊戲數 ${runs}　收穫拼圖 ${pieces}`);
+      const scoreText = this.state?.score > 0 ? `　分 ${this.state.score}` : '';
+      this.infoText.setText(`地面 · 遊戲數 ${runs} · 收穫拼圖 ${pieces}${scoreText}`);
+    }
+    if (this.relicText) {
+      const relics = this.meta?.unlockedRelics || [];
+      const tags = [];
+      if (relics.includes('extra_tool')) tags.push('+');
+      if (relics.includes('stone_resist')) tags.push('岩');
+      if (relics.includes('survey_aura')) tags.push('🧲');
+      this.relicText.setText(tags.length ? `遺物 ${tags.join(' ')}` : '遺物 -');
     }
   }
 
@@ -270,6 +562,7 @@ class DiggerScene extends Phaser.Scene {
     this.toolsText.setText(`工具: ${state.tools}`);
     this.bestText.setText( `最佳: ${state.bestDepth}`);
     this.scoreText.setText(state.score > 0 ? `分 ${state.score}` : '');
+    if (this.pauseBtn) this.pauseBtn.setText(state.paused ? '繼續' : '暫停');
 
     const streak = state.safeStreak || 0;
     if (streak >= 5) {
@@ -281,8 +574,19 @@ class DiggerScene extends Phaser.Scene {
 
     if (!state.alive)        this.statusText.setText('工具壞掉了');
     else if (state.paused)   this.statusText.setText('⏸ 已暫停');
-    else if (state.inEvent)  this.statusText.setText('事件中，按 1/2/3 選擇');
+    else if (state.inEvent)  this.statusText.setText(this.eventMode === 'roulette' ? '轉盤旋轉中…' : '事件中，按 1/2/3 選擇');
+    else if (state.autoDigActive) this.statusText.setText(`自動挖掘（${state.autoDigSide === 'left' ? '左' : '右'}）`);
     else                     this.statusText.setText('');
+
+    const maxTools = state.maxTools || state.tools || 1;
+    const toolRatio = Math.max(0, Math.min(1, state.tools / maxTools));
+    this.toolMeterFill.width = 90 * toolRatio;
+    if (toolRatio > 0.6) this.toolMeterFill.setFillStyle(0x52d48a);
+    else if (toolRatio > 0.3) this.toolMeterFill.setFillStyle(0xf6cf4a);
+    else this.toolMeterFill.setFillStyle(0xe05050);
+
+    if (state.goldPlatingActive) this.toolsText.setStyle({ backgroundColor: '#7a6400aa', color: '#fff4b0' });
+    else this.toolsText.setStyle({ backgroundColor: '#00000044', color: '#f8f3e6' });
 
     // ── Tiles
     this._renderTiles(this.leftTiles,  state.previews.left);
@@ -352,11 +656,13 @@ class DiggerScene extends Phaser.Scene {
   }
 
   _onEvent(eventData, done) {
-    this.inEvent    = true;
-    this.eventDone  = done;
+    this.inEvent = true;
+    this.eventDone = done;
     this.eventOptions = eventData.options.slice(0, 3);
+    this.eventMode = eventData.mode || 'choice';
     sfx.event();
 
+    this._clearRouletteTimer();
     this.modalLayer.removeAll(true);
 
     const panelW = WIDTH - 40;
@@ -364,41 +670,111 @@ class DiggerScene extends Phaser.Scene {
     const panelX = WIDTH / 2;
     const panelY = HEIGHT / 2;
 
-    const bg    = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.92).setStrokeStyle(2, 0xf6cf4a);
+    const bg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x000000, 0.92).setStrokeStyle(2, 0xf6cf4a);
     const title = this.add.text(panelX, panelY - 120, eventData.title || '地底事件', { fontFamily: 'Arial', fontSize: '24px', color: '#ffe58a' }).setOrigin(0.5, 0);
-    const desc  = this.add.text(panelX, panelY - 84,  eventData.desc  || '', { fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', wordWrap: { width: panelW - 40 } }).setOrigin(0.5, 0);
-
+    const desc = this.add.text(panelX, panelY - 84, eventData.desc || '', {
+      fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6', wordWrap: { width: panelW - 40 }
+    }).setOrigin(0.5, 0);
     this.modalLayer.add([bg, title, desc]);
+
+    if (this.eventMode === 'roulette') {
+      const cards = [];
+      const cardW = panelW - 70;
+      const startY = panelY - 24;
+      for (let i = 0; i < this.eventOptions.length; i++) {
+        const opt = this.eventOptions[i];
+        const y = startY + i * 62;
+        const card = this.add.rectangle(panelX, y + 18, cardW, 52, 0x3a2510).setStrokeStyle(2, 0x7a5a2a);
+        const label = this.add.text(panelX, y + 4, `${opt.title} - ${opt.desc}`, {
+          fontFamily: 'Arial', fontSize: '14px', color: '#f8f3e6', wordWrap: { width: cardW - 22 }, align: 'center'
+        }).setOrigin(0.5, 0);
+        cards.push({ card, label });
+        this.modalLayer.add([card, label]);
+      }
+      const hint = this.add.text(panelX, panelY + 108, '轉盤旋轉中…', {
+        fontFamily: 'Arial', fontSize: '13px', color: '#a09070'
+      }).setOrigin(0.5, 0);
+      this.modalLayer.add(hint);
+
+      let idx = 0;
+      let ticks = 0;
+      let resolved = false;
+      const maxTicks = 12 + Math.floor(Math.random() * 6);
+
+      const setActive = (activeIdx) => {
+        for (let i = 0; i < cards.length; i++) {
+          const active = i === activeIdx;
+          cards[i].card.setFillStyle(active ? 0xb58429 : 0x3a2510);
+          cards[i].label.setColor(active ? '#fffbe6' : '#f8f3e6');
+          cards[i].card.setAlpha(active ? 1 : 0.85);
+          cards[i].label.setAlpha(active ? 1 : 0.9);
+        }
+      };
+
+      this.rouletteTimer = this.time.addEvent({
+        delay: 120,
+        loop: true,
+        callback: () => {
+          if (resolved || !this.inEvent) {
+            this._clearRouletteTimer();
+            return;
+          }
+          setActive(idx);
+          idx = (idx + 1) % cards.length;
+          ticks += 1;
+          if (ticks >= maxTicks) {
+            resolved = true;
+            this._clearRouletteTimer();
+            const finalIndex = (idx + cards.length - 1) % cards.length;
+            setActive(finalIndex);
+            hint.setText(`獲得：${this.eventOptions[finalIndex].title}`);
+            this.time.delayedCall(1500, () => {
+              if (this.inEvent) this._resolveEventChoice(this.eventOptions[finalIndex]);
+            });
+          }
+        }
+      });
+      return;
+    }
 
     for (let i = 0; i < this.eventOptions.length; i++) {
       const opt = this.eventOptions[i];
-      const y   = panelY - 10 + i * 60;
+      const y = panelY - 10 + i * 60;
       const btn = this.add.text(panelX, y, `${i + 1}. ${opt.title} - ${opt.desc}`, {
         fontFamily: 'Arial', fontSize: '15px', color: '#f8f3e6',
         backgroundColor: '#3a2510', padding: { x: 12, y: 8 },
         wordWrap: { width: panelW - 60 }
       }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true });
-      btn.on('pointerover',  () => btn.setStyle({ color: '#ffe58a' }));
-      btn.on('pointerout',   () => btn.setStyle({ color: '#f8f3e6' }));
-      btn.on('pointerdown',  () => this._handleEventChoice(i));
+      btn.on('pointerover', () => btn.setStyle({ color: '#ffe58a' }));
+      btn.on('pointerout', () => btn.setStyle({ color: '#f8f3e6' }));
+      btn.on('pointerdown', () => this._handleEventChoice(i));
       this.modalLayer.add(btn);
     }
   }
 
-  _handleEventChoice(index) {
-    if (!this.inEvent || !this.eventDone) return;
-    const choice = this.eventOptions[index];
-    if (!choice) return;
+  _resolveEventChoice(choice) {
+    if (!this.inEvent || !this.eventDone || !choice) return;
     this.inEvent = false;
     const done = this.eventDone;
     this.eventDone = null;
+    this.eventMode = 'choice';
+    this._clearRouletteTimer();
     this.modalLayer.removeAll(true);
     done(choice);
+  }
+
+  _handleEventChoice(index) {
+    if (!this.inEvent || !this.eventDone || this.eventMode !== 'choice') return;
+    const choice = this.eventOptions[index];
+    if (!choice) return;
+    this._resolveEventChoice(choice);
   }
 
   _onGameOver(restart) {
     sfx.gameOver();
     this._restartFn = restart;
+    this._clearRouletteTimer();
+    this.cameras.main.shake(350, 0.015);
 
     const score       = this.state.score || 0;
     const isNewScore  = score > this.bestScore;
@@ -433,6 +809,7 @@ class DiggerScene extends Phaser.Scene {
     addLine(isRecord ? '🏆 新紀錄！' : '工具全壞了', { fontSize: '28px', color: isRecord ? '#d89b31' : '#ffe58a' });
     curY += 4;
     addLine(`本次深度：${this.state.depth}`);
+    addLine(`上次最佳：${this.state.bestDepth || 0}`, { fontSize: '13px', color: '#a09070' });
     addLine(isNewScore ? `⭐ 最高分：${score}` : `分數：${score}`, { color: isNewScore ? '#d89b31' : '#a09070', fontSize: '15px' });
     if (this.state.maxSafeStreak >= 3) {
       addLine(`🔥 最長安全連挖：${this.state.maxSafeStreak} 格`, { fontSize: '13px', color: '#c8b87e' });
@@ -507,274 +884,4 @@ new Phaser.Game({
   scene: [DiggerScene],
   render: { antialias: false, pixelArt: true, roundPixels: true },
   scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
-});
-
-
-const WIDTH = 480;
-const HEIGHT = 800;
-
-class DiggerScene extends Phaser.Scene {
-  constructor() {
-    super('DiggerScene');
-    this.logic = null;
-    this.state = null;
-    this.meta = null;
-    this.muted = loadMute();
-    this.inEvent = false;
-    this.eventOptions = [];
-  }
-
-  preload() {
-    this.load.spritesheet('worker', 'assets/sprite-forge/minipack/worker.png', {
-      frameWidth: 64,
-      frameHeight: 64
-    });
-    this.load.image('tile_dirt', 'assets/sprite-forge/minipack/tile_dirt.png');
-    this.load.image('tile_stone', 'assets/sprite-forge/minipack/tile_stone.png');
-    this.load.image('tile_diamond', 'assets/sprite-forge/minipack/tile_diamond.png');
-    this.load.image('tile_event', 'assets/sprite-forge/minipack/tile_event.png');
-    this.load.image('tile_puzzle', 'assets/sprite-forge/minipack/tile_puzzle.png');
-    this.load.image('tile_empty', 'assets/sprite-forge/minipack/tile_empty.png');
-  }
-
-  create() {
-    this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x2b1b11);
-
-    this.depthText = this.add.text(16, 12, '深度: 0', this.uiStyle());
-    this.toolsText = this.add.text(170, 12, '工具: 0', this.uiStyle());
-    this.bestText = this.add.text(320, 12, '最佳: 0', this.uiStyle());
-
-    this.statusText = this.add.text(16, 44, '', {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#f1ddba'
-    });
-
-    this.leftColX = 140;
-    this.rightColX = 340;
-    this.gridTop = 110;
-    this.tileH = 95;
-
-    this.leftTiles = this.createTileColumn(this.leftColX);
-    this.rightTiles = this.createTileColumn(this.rightColX);
-
-    if (!this.anims.exists('worker-walk')) {
-      this.anims.create({
-        key: 'worker-walk',
-        frames: this.anims.generateFrameNumbers('worker', { start: 0, end: 3 }),
-        frameRate: 8,
-        repeat: -1
-      });
-    }
-
-    this.worker = this.add.sprite(this.leftColX - 24, this.gridTop - 18, 'worker', 0);
-    this.worker.setDisplaySize(64, 64);
-    this.worker.setFlipX(true);
-    this.worker.play('worker-walk');
-
-    const leftZone = this.add.zone(0, 0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
-    const rightZone = this.add.zone(WIDTH / 2, 0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
-    leftZone.on('pointerdown', () => this.dig('left'));
-    rightZone.on('pointerdown', () => this.dig('right'));
-
-    this.input.keyboard.on('keydown-LEFT', () => this.dig('left'));
-    this.input.keyboard.on('keydown-A', () => this.dig('left'));
-    this.input.keyboard.on('keydown-RIGHT', () => this.dig('right'));
-    this.input.keyboard.on('keydown-D', () => this.dig('right'));
-    this.input.keyboard.on('keydown-ONE', () => this.handleEventChoice(0));
-    this.input.keyboard.on('keydown-TWO', () => this.handleEventChoice(1));
-    this.input.keyboard.on('keydown-THREE', () => this.handleEventChoice(2));
-    this.input.keyboard.on('keydown-P', () => {
-      if (this.logic && this.state && this.state.alive && !this.state.inEvent) this.logic.togglePause();
-    });
-
-    this.muteBtn = this.add.text(WIDTH - 72, HEIGHT - 36, this.muted ? '🔇' : '🔊', {
-      fontFamily: 'Arial',
-      fontSize: '22px',
-      backgroundColor: '#00000055'
-    }).setInteractive({ useHandCursor: true });
-    this.muteBtn.on('pointerdown', () => {
-      this.muted = !this.muted;
-      saveMute(this.muted);
-      this.muteBtn.setText(this.muted ? '🔇' : '🔊');
-    });
-
-    this.logic = new Game(
-      (state) => this.onUpdate(state),
-      (eventData, done) => this.onEvent(eventData, done),
-      (restart) => this.onGameOver(restart),
-      (meta) => { this.meta = meta; }
-    );
-  }
-
-  uiStyle() {
-    return {
-      fontFamily: 'Arial',
-      fontSize: '20px',
-      color: '#f8f3e6',
-      backgroundColor: '#00000044',
-      padding: { x: 8, y: 4 }
-    };
-  }
-
-  createTileColumn(x) {
-    const arr = [];
-    for (let i = 0; i < 5; i++) {
-      const y = this.gridTop + i * this.tileH;
-      const bg = this.add.rectangle(x, y, 120, 82, 0x4c2814).setStrokeStyle(2, 0x221309);
-      const sprite = this.add.image(x, y, 'tile_dirt').setDisplaySize(48, 48);
-      arr.push({ bg, sprite });
-    }
-    return arr;
-  }
-
-  placeWorker(side) {
-    this.worker.x = side === 'left' ? this.leftColX - 24 : this.rightColX - 24;
-    this.worker.setFlipX(side === 'left');
-  }
-
-  dig(side) {
-    if (!this.logic || !this.state || !this.state.alive || this.state.inEvent || this.state.paused) return;
-    if (this.state.autoDigActive) {
-      this.logic.switchAutoSide(side);
-      this.placeWorker(side);
-      return;
-    }
-    this.placeWorker(side);
-    this.logic.step(side);
-  }
-
-  onUpdate(state) {
-    this.state = state;
-    this.depthText.setText(`深度: ${state.depth}`);
-    this.toolsText.setText(`工具: ${state.tools}`);
-    this.bestText.setText(`最佳: ${state.bestDepth}`);
-
-    if (!state.alive) this.statusText.setText('工具壞掉了');
-    else if (state.paused) this.statusText.setText('已暫停');
-    else if (state.inEvent) this.statusText.setText('事件中，按 1/2/3 選擇');
-    else this.statusText.setText('');
-
-    this.renderTiles(this.leftTiles, state.previews.left);
-    this.renderTiles(this.rightTiles, state.previews.right);
-
-    if (state.autoDigSide === 'left' || state.autoDigSide === 'right') {
-      this.placeWorker(state.autoDigSide);
-    }
-
-    const depthRatio = Math.min(1, state.depth / 150);
-    const shade = Phaser.Math.Linear(0x2b1b11, 0x0f0906, depthRatio);
-    this.cameras.main.setBackgroundColor(shade);
-  }
-
-  renderTiles(col, tiles) {
-    for (let i = 0; i < 5; i++) {
-      const t = tiles[i];
-      const tile = col[i];
-      const cfg = this.tileStyle(t);
-      tile.bg.setFillStyle(cfg.color);
-      tile.sprite.setTexture(cfg.texture);
-      tile.sprite.setAlpha(cfg.alpha);
-    }
-  }
-
-  tileStyle(type) {
-    if (type === 'stone') return { color: 0x5c5450, texture: 'tile_stone', alpha: 1 };
-    if (type === 'diamond') return { color: 0x7fb3d1, texture: 'tile_diamond', alpha: 1 };
-    if (type === 'event') return { color: 0xa4572f, texture: 'tile_event', alpha: 1 };
-    if (type === 'puzzle') return { color: 0xc79532, texture: 'tile_puzzle', alpha: 1 };
-    if (type === 'empty') return { color: 0x2d180c, texture: 'tile_empty', alpha: 0.45 };
-    return { color: 0x4c2814, texture: 'tile_dirt', alpha: 1 };
-  }
-
-  onEvent(eventData, done) {
-    this.inEvent = true;
-    this.eventDone = done;
-    this.eventOptions = eventData.options.slice(0, 3);
-
-    if (this.eventContainer) this.eventContainer.destroy(true);
-    this.eventContainer = this.add.container(0, 0);
-
-    const bg = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH - 40, 300, 0x000000, 0.9).setStrokeStyle(2, 0xf6cf4a);
-    const title = this.add.text(44, 268, eventData.title || '地底事件', {
-      fontFamily: 'Arial',
-      fontSize: '26px',
-      color: '#ffe58a'
-    });
-    const desc = this.add.text(44, 304, eventData.desc || '', {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#f8f3e6',
-      wordWrap: { width: WIDTH - 84 }
-    });
-
-    this.eventContainer.add([bg, title, desc]);
-
-    this.eventOptionTexts = [];
-    for (let i = 0; i < this.eventOptions.length; i++) {
-      const y = 368 + i * 64;
-      const option = this.eventOptions[i];
-      const txt = this.add.text(56, y, `${i + 1}. ${option.title} - ${option.desc}`, {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#f8f3e6',
-        backgroundColor: '#2b1b11'
-      }).setInteractive({ useHandCursor: true });
-      txt.on('pointerdown', () => this.handleEventChoice(i));
-      this.eventContainer.add(txt);
-      this.eventOptionTexts.push(txt);
-    }
-  }
-
-  handleEventChoice(index) {
-    if (!this.inEvent || !this.eventDone) return;
-    const choice = this.eventOptions[index];
-    if (!choice) return;
-    this.inEvent = false;
-    if (this.eventContainer) this.eventContainer.destroy(true);
-    const done = this.eventDone;
-    this.eventDone = null;
-    done(choice);
-  }
-
-  onGameOver(restart) {
-    const overlay = this.add.container(0, 0);
-    const bg = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH - 40, 220, 0x000000, 0.9).setStrokeStyle(2, 0xe05050);
-    const title = this.add.text(88, 300, '工具全壞了', {
-      fontFamily: 'Arial',
-      fontSize: '34px',
-      color: '#ffe58a'
-    });
-    const info = this.add.text(96, 350, `本次深度: ${this.state.depth}\n按 R 重新開始`, {
-      fontFamily: 'Arial',
-      fontSize: '20px',
-      color: '#f8f3e6'
-    });
-    overlay.add([bg, title, info]);
-
-    const handler = () => {
-      this.input.keyboard.off('keydown-R', handler);
-      overlay.destroy(true);
-      restart('normal');
-    };
-    this.input.keyboard.on('keydown-R', handler);
-  }
-}
-
-new Phaser.Game({
-  type: Phaser.AUTO,
-  width: WIDTH,
-  height: HEIGHT,
-  parent: 'app',
-  backgroundColor: '#2b1b11',
-  scene: [DiggerScene],
-  render: {
-    antialias: false,
-    pixelArt: true,
-    roundPixels: true
-  },
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  }
 });

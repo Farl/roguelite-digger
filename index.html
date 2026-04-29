@@ -769,9 +769,9 @@
       const phaserScript = document.createElement('script');
       phaserScript.src = 'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js';
       phaserScript.onload = () => {
-        import('./phaser-main.js').catch(() => {
+        import('./phaser-main.js').catch((err) => {
           import('./main.js');
-          console.warn('[engine] phaser module failed, fallback to dom');
+          console.warn('[engine] phaser module failed, fallback to dom', err);
         });
       };
       phaserScript.onerror = () => {

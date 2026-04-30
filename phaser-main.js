@@ -10,6 +10,8 @@ const WIDTH  = 480;
 const HEIGHT = 800;
 const MILESTONES = [5, 10, 20, 30, 50, 75, 100, 150, 200];
 const FONT_FAMILY = 'Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif';
+const PIXEL_FONT = 'monospace';
+const TILE_FIT_MODE = 'cover';
 
 // ─── Web Audio (same synth as DOM version) ───────────────────────
 let _audioCtx = null;
@@ -68,13 +70,15 @@ class DiggerScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spritesheet('worker', 'assets/sprite-forge/minipack/worker.png', { frameWidth: 64, frameHeight: 64 });
-    this.load.image('tile_dirt',    'assets/sprite-forge/minipack/tile_dirt.png');
-    this.load.image('tile_stone',   'assets/sprite-forge/minipack/tile_stone.png');
-    this.load.image('tile_diamond', 'assets/sprite-forge/minipack/tile_diamond.png');
-    this.load.image('tile_event',   'assets/sprite-forge/minipack/tile_event.png');
-    this.load.image('tile_puzzle',  'assets/sprite-forge/minipack/tile_puzzle.png');
-    this.load.image('tile_empty',   'assets/sprite-forge/minipack/tile_empty.png');
+    this.load.image('worker', 'assets/ui/gameplay/worker_v2.png');
+    this.load.image('ui_panel', 'assets/ui/ui_panel.png');
+    this.load.image('bg_gameplay', 'assets/ui/gameplay/bg_gameplay_raw.png');
+    this.load.image('tile_dirt',    'assets/ui/gameplay/tile_dirt_v2.png');
+    this.load.image('tile_stone',   'assets/ui/gameplay/tile_stone_v2.png');
+    this.load.image('tile_diamond', 'assets/ui/gameplay/tile_diamond_v2.png');
+    this.load.image('tile_event',   'assets/ui/gameplay/tile_event_v2.png');
+    this.load.image('tile_puzzle',  'assets/ui/gameplay/tile_puzzle_v2.png');
+    this.load.image('tile_empty',   'assets/ui/gameplay/tile_empty_v2.png');
   }
 
   create() {
@@ -82,31 +86,41 @@ class DiggerScene extends Phaser.Scene {
     this.bestScore = loadBestScore();
 
     // ── Background
-    this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x1a1009);
+    this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x130b04);
+    this.add.image(WIDTH / 2, HEIGHT / 2, 'bg_gameplay').setDisplaySize(WIDTH, HEIGHT).setAlpha(0.5);
+    // HUD background (120px tall)
+    this.add.rectangle(WIDTH / 2, 60, WIDTH, 120, 0x1a1009);
+    this.add.rectangle(WIDTH / 2, HEIGHT - 26, WIDTH, 52, 0x1a1009);
+    // HUD bottom separator & button bar top separator
+    this.add.line(WIDTH / 2, 120, 0, 0, WIDTH, 0, 0x3a2510, 1).setLineWidth(2, 2);
+    this.add.line(WIDTH / 2, HEIGHT - 52, 0, 0, WIDTH, 0, 0x3a2510, 1).setLineWidth(2, 2);
+    // HUD column separators
+    this.add.line(160, 60, 0, -50, 0, 50, 0x3a2510, 1).setLineWidth(1, 1);
+    this.add.line(320, 60, 0, -50, 0, 50, 0x3a2510, 1).setLineWidth(1, 1);
 
     this._createUITextures();
 
-    // ── HUD row 1: depth / tools / best
-    const hudStyle = { fontFamily: FONT_FAMILY, fontSize: '20px', color: '#f8f3e6', backgroundColor: '#00000055', padding: { x: 8, y: 4 } };
-    this.depthText = this.add.text(12,  12, '深度: 0', hudStyle);
-    this.toolsText = this.add.text(160, 12, '工具: 0', hudStyle);
-    this.bestText  = this.add.text(318, 12, '最佳: 0', hudStyle);
+    // ── HUD row 1: depth / tools / best  (centered in each third)
+    const hudStyle = { fontFamily: PIXEL_FONT, fontSize: '15px', color: '#f3e5b8' };
+    this.depthText = this.add.text(80,  14, '深度 0', hudStyle).setOrigin(0.5, 0);
+    this.toolsText = this.add.text(240, 14, '工具 0', hudStyle).setOrigin(0.5, 0);
+    this.bestText  = this.add.text(400, 14, '最佳 0', hudStyle).setOrigin(0.5, 0);
 
-    // Tool durability meter (same thresholds as DOM)
-    this.toolMeterTrack = this.add.rectangle(186, 39, 90, 4, 0x1b120a).setOrigin(0, 0);
-    this.toolMeterFill = this.add.rectangle(186, 39, 90, 4, 0x52d48a).setOrigin(0, 0);
+    // Tool durability meter (centered under 工具)
+    this.toolMeterTrack = this.add.rectangle(240, 40, 120, 8, 0x2a1808).setOrigin(0.5, 0).setStrokeStyle(1, 0x5a4020);
+    this.toolMeterFill = this.add.rectangle(181, 41, 118, 6, 0xf6cf4a).setOrigin(0, 0);
 
     // ── HUD row 2: score + streak
-    const subStyle = { fontFamily: FONT_FAMILY, fontSize: '16px', color: '#c8b87e', backgroundColor: '#00000033', padding: { x: 6, y: 2 } };
-    this.scoreText  = this.add.text(12,  44, '', subStyle);
-    this.streakText = this.add.text(210, 44, '', subStyle);
+    const subStyle = { fontFamily: PIXEL_FONT, fontSize: '13px', color: '#d9c381' };
+    this.scoreText  = this.add.text(80,  58, '', subStyle).setOrigin(0.5, 0);
+    this.streakText = this.add.text(240, 58, '', subStyle).setOrigin(0.5, 0);
 
     // ── Status line
-    this.statusText = this.add.text(12, 68, '', { fontFamily: FONT_FAMILY, fontSize: '14px', color: '#f1ddba' });
+    this.statusText = this.add.text(WIDTH / 2, 78, '', { fontFamily: PIXEL_FONT, fontSize: '12px', color: '#e8d8a0' }).setOrigin(0.5, 0);
 
     // ── AutoDig bar
-    this.autoDigBar   = this.add.rectangle(WIDTH / 2, 94, 0, 6, 0xf6cf4a).setOrigin(0.5, 0);
-    this.autoDigLabel = this.add.text(12, 90, '', { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#f6cf4a' });
+    this.autoDigBar   = this.add.rectangle(WIDTH / 2, 99, 0, 7, 0xf6cf4a).setOrigin(0.5, 0);
+    this.autoDigLabel = this.add.text(12, 96, '', { fontFamily: PIXEL_FONT, fontSize: '11px', color: '#f6cf4a' });
 
     // ── Tile grid
     const sidePadding = 18;
@@ -114,18 +128,16 @@ class DiggerScene extends Phaser.Scene {
     this.colW = (WIDTH - sidePadding * 2 - colGap) / 2;
     this.leftColX  = sidePadding + this.colW / 2;
     this.rightColX = WIDTH - sidePadding - this.colW / 2;
-    this.gridTop   = 126;
+    this.gridTop   = 220;
     this.tileH     = 105;
     this.leftTiles  = this._createTileColumn(this.leftColX);
     this.rightTiles = this._createTileColumn(this.rightColX);
 
     // ── Worker animation
-    if (!this.anims.exists('worker-walk')) {
-      this.anims.create({ key: 'worker-walk', frames: this.anims.generateFrameNumbers('worker', { start: 0, end: 3 }), frameRate: 8, repeat: -1 });
-    }
-    this.worker = this.add.sprite(this.leftColX - 34, this.gridTop - 26, 'worker', 0).setDisplaySize(72, 72).setFlipX(true);
-    this.worker.play('worker-walk');
-
+    this.worker = this.add.image(this.leftColX - 36, this._workerStandY(), 'worker')
+      .setDisplaySize(96, 96)
+      .setOrigin(0.5, 1)
+      .setFlipX(true);
     // ── Input zones
     const leftZone  = this.add.zone(0,        0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
     const rightZone = this.add.zone(WIDTH / 2, 0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
@@ -150,41 +162,52 @@ class DiggerScene extends Phaser.Scene {
     kb.on('keydown-H',     () => this._showHelpModal());
 
     // ── Bottom button bar (graphical)
-    const btnY = HEIGHT - 36;
-    const btnCenters = [40, 120, 200, 280, 360, 440];
-    const btnW = 72, btnH = 28;
-    const mkBtn = (cx, label) => {
+    // 6 buttons across WIDTH=480: each ~80px wide
+    const btnY  = HEIGHT - 26;
+    const btnW  = 76, btnH = 30;
+    const btnGap = (WIDTH - 6 * btnW) / 7;  // even spacing with margins
+    const mkBtn = (idx, label, accent = false) => {
+      const cx = btnGap + btnW / 2 + idx * (btnW + btnGap);
       const g = this.add.graphics();
-      g.fillStyle(0x1c1008, 1);
-      g.fillRoundedRect(cx - btnW / 2, btnY - btnH / 2, btnW, btnH, 5);
-      g.lineStyle(1.5, 0x5a4020, 1);
-      g.strokeRoundedRect(cx - btnW / 2 + 1, btnY - btnH / 2 + 1, btnW - 2, btnH - 2, 5);
-      const t = this.add.text(cx, btnY, label, { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#d8c49a' })
+      const fill = accent ? 0x3c200e : 0x221208;
+      const border = accent ? 0xd4920a : 0x7a5520;
+      g.fillStyle(fill, 1);
+      g.fillRect(cx - btnW / 2, btnY - btnH / 2, btnW, btnH);
+      g.lineStyle(1, border, 1);
+      g.strokeRect(cx - btnW / 2 + 0.5, btnY - btnH / 2 + 0.5, btnW - 1, btnH - 1);
+      // top highlight
+      g.lineStyle(1, 0x6a4020, 0.5);
+      g.strokeLineShape(new Phaser.Geom.Line(cx - btnW / 2 + 2, btnY - btnH / 2 + 1, cx + btnW / 2 - 3, btnY - btnH / 2 + 1));
+      // bottom shadow
+      g.lineStyle(1, 0x110800, 0.8);
+      g.strokeLineShape(new Phaser.Geom.Line(cx - btnW / 2 + 1, btnY + btnH / 2 - 2, cx + btnW / 2 - 2, btnY + btnH / 2 - 2));
+      const col = accent ? '#f6cf4a' : '#d9c381';
+      const t = this.add.text(cx, btnY, label, { fontFamily: PIXEL_FONT, fontSize: '12px', color: col })
         .setOrigin(0.5).setInteractive({ useHandCursor: true });
-      t.on('pointerover', () => t.setColor('#ffe58a'));
-      t.on('pointerout',  () => t.setColor('#d8c49a'));
+      t.on('pointerover', () => { t.setColor('#ffffff'); g.clear(); g.fillStyle(accent ? 0x5a3010 : 0x3a2010, 1); g.fillRect(cx - btnW / 2, btnY - btnH / 2, btnW, btnH); g.lineStyle(1, 0xf6cf4a, 1); g.strokeRect(cx - btnW / 2 + 0.5, btnY - btnH / 2 + 0.5, btnW - 1, btnH - 1); });
+      t.on('pointerout',  () => { t.setColor(col); g.clear(); g.fillStyle(fill, 1); g.fillRect(cx - btnW / 2, btnY - btnH / 2, btnW, btnH); g.lineStyle(1, border, 1); g.strokeRect(cx - btnW / 2 + 0.5, btnY - btnH / 2 + 0.5, btnW - 1, btnH - 1); });
       return t;
     };
-    this.pauseBtn = mkBtn(btnCenters[0], '暫停');
+    this.pauseBtn      = mkBtn(0, '暫停');
     this.pauseBtn.on('pointerdown', () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
-    this.muteBtn = mkBtn(btnCenters[1], _muted ? '音關' : '音開');
-    this.muteBtn.on('pointerdown', () => { _muted = !_muted; saveMute(_muted); this.muteBtn.setText(_muted ? '音關' : '音開'); });
-    this.helpBtn = mkBtn(btnCenters[2], '說明');
+    this.muteBtn       = mkBtn(1, _muted ? '靜音' : '音效');
+    this.muteBtn.on('pointerdown', () => { _muted = !_muted; saveMute(_muted); this.muteBtn.setText(_muted ? '靜音' : '音效'); });
+    this.helpBtn       = mkBtn(2, '說明');
     this.helpBtn.on('pointerdown', () => this._showHelpModal());
-    this.collectionBtn = mkBtn(btnCenters[3], '收藏');
+    this.collectionBtn = mkBtn(3, '收藏');
     this.collectionBtn.on('pointerdown', () => this._showCollectionModal());
-    this.restartBtn = mkBtn(btnCenters[4], '重開');
+    this.restartBtn    = mkBtn(4, '重開', true);
     this.restartBtn.on('pointerdown', () => { if (!this.logic) return; this._showDifficultyModal(diff => this.logic.startRun(diff)); });
-    this.clearBtn = mkBtn(btnCenters[5], '清進度');
+    this.clearBtn      = mkBtn(5, '清進度');
     this.clearBtn.on('pointerdown', () => this._showClearProgressModal());
 
-    this.relicText = this.add.text(12, 108, '', {
-      fontFamily: FONT_FAMILY, fontSize: '12px', color: '#c8b87e'
-    }).setDepth(5);
+    this.relicText = this.add.text(WIDTH / 2, 100, '', {
+      fontFamily: PIXEL_FONT, fontSize: '11px', color: '#c8b87e'
+    }).setOrigin(0.5, 0).setDepth(5);
 
     // ── Bottom info bar (sits below buttons)
     this.infoText = this.add.text(12, HEIGHT - 14, '', {
-      fontFamily: FONT_FAMILY, fontSize: '11px', color: '#8f7a5a'
+      fontFamily: PIXEL_FONT, fontSize: '10px', color: '#8f7a5a'
     }).setDepth(5);
 
     // ── Modal layer (drawn last = on top)
@@ -202,8 +225,8 @@ class DiggerScene extends Phaser.Scene {
       (m, _relics, lastPuzzlePiece) => this._onMeta(m, lastPuzzlePiece)
     );
 
-    // ── Start with difficulty modal
-    this._showDifficultyModal(diff => this.logic.startRun(diff));
+    // ── Start directly so gameplay visuals are immediately visible.
+    this.logic.startRun('normal');
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -214,14 +237,30 @@ class DiggerScene extends Phaser.Scene {
     const arr = [];
     for (let i = 0; i < 5; i++) {
       const baseY = this.gridTop + i * this.tileH;
-      const sprite = this.add.image(x, baseY, 'tile_dirt').setDisplaySize(this.colW, this.tileH + 1);
+      // Use TileSprite to fill each cell without stretching source pixels.
+      const sprite = this.add.tileSprite(x, baseY, this.colW, this.tileH + 1, 'tile_dirt').setOrigin(0.5, 0);
       arr.push({ sprite, baseY });
     }
     return arr;
   }
 
+  _workerStandY() {
+    // Feet at top of first tile row; head at gridTop-72 = ~114, just below HUD (ends y=108).
+    return this.gridTop;
+  }
+  
+  _refreshTileLayout() {
+    for (const col of [this.leftTiles, this.rightTiles]) {
+      for (const t of col) {
+        t.sprite.width = this.colW;
+        t.sprite.height = this.tileH + 1;
+      }
+    }
+  }
+
   _placeWorker(side) {
     this.worker.x = side === 'left' ? this.leftColX - 34 : this.rightColX - 34;
+    this.worker.y = this._workerStandY();
     this.worker.setFlipX(side === 'left');
   }
 
@@ -240,8 +279,8 @@ class DiggerScene extends Phaser.Scene {
       t.sprite.y = t.baseY + this.tileScrollOffset;
       this.tweens.add({ targets: t.sprite, y: t.baseY, duration: 130, ease: 'Cubic.Out' });
     }
-    const workerBaseY = this.gridTop - 26;
-    this.worker.y = workerBaseY + 10;
+    const workerBaseY = this._workerStandY();
+    this.worker.y = workerBaseY + 8;
     this.tweens.add({ targets: this.worker, y: workerBaseY, duration: 140, ease: 'Cubic.Out' });
   }
 
@@ -290,6 +329,7 @@ class DiggerScene extends Phaser.Scene {
   }
 
   _showClearProgressModal() {
+  this._refreshTileLayout();
     const show = () => {
       this.modalLayer.removeAll(true);
       const panelW = WIDTH - 70;
@@ -319,33 +359,65 @@ class DiggerScene extends Phaser.Scene {
   }
 
   _createUITextures() {
-    const makePanel = (key, borderColor, innerGlow) => {
-      if (this.textures.exists(key)) return;
-      const g = this.make.graphics({ add: false });
-      const w = 80, h = 80, r = 12;
-      g.fillStyle(0x130b04, 1);
-      g.fillRoundedRect(0, 0, w, h, r);
-      g.lineStyle(3, borderColor, 1);
-      g.strokeRoundedRect(1.5, 1.5, w - 3, h - 3, r);
-      g.lineStyle(1, innerGlow, 0.35);
-      g.strokeRoundedRect(5, 5, w - 10, h - 10, r - 3);
-      g.generateTexture(key, w, h);
-      g.destroy();
-    };
-    makePanel('ui_panel',     0xb8851a, 0xf6cf4a);
-    makePanel('ui_panel_red', 0xb03028, 0xe05050);
+    // Use authored sprite panel texture directly (provided art), not procedural boxes.
+    // This keeps corner ornaments intact under 9-slice scaling.
+    const srcKey = 'ui_panel';
+    const croppedKey = 'ui_panel_9src';
+    if (!this.textures.exists(srcKey) || this.textures.exists(croppedKey)) return;
+
+    const src = this.textures.get(srcKey)?.getSourceImage();
+    if (!src) return;
+
+    // ui_panel.png contains transparent padding; trim it first so 9-slice borders
+    // map to actual ornament corners/edges instead of transparent margins.
+    const sx = 9, sy = 9, sw = 62, sh = 63;
+    const canvasTex = this.textures.createCanvas(croppedKey, sw, sh);
+    const ctx = canvasTex.getContext();
+    ctx.clearRect(0, 0, sw, sh);
+    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
+    canvasTex.refresh();
   }
 
   _makePanel(x, y, w, h, variant = 'ui_panel') {
-    return this.add.nineslice(x, y, variant, undefined, w, h, 12, 12, 12, 12);
+    const key = this.textures.exists('ui_panel_9src') ? 'ui_panel_9src' : 'ui_panel';
+    // Borders tuned for the trimmed source (62x63) to match the provided art's corner size.
+    const panel = this.add.nineslice(x, y, key, undefined, w, h, 18, 18, 18, 18);
+    if (variant === 'ui_panel_red') {
+      panel.setTint(0xffb0b0);
+    }
+    return panel;
   }
 
   _drawCard(g, x, y, w, h, hi) {
     g.clear();
-    g.fillStyle(hi ? 0x4c3118 : 0x2a1808, 1);
-    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
-    g.lineStyle(2, hi ? 0xf6cf4a : 0x7a5a2a, 1);
-    g.strokeRoundedRect(x - w / 2 + 1, y - h / 2 + 1, w - 2, h - 2, 8);
+    g.fillStyle(hi ? 0x3a2410 : 0x2a1808, 1);
+    g.fillRect(x - w / 2, y - h / 2, w, h);
+    g.lineStyle(1, hi ? 0xf6cf4a : 0x8c6428, 1);
+    g.strokeRect(x - w / 2 + 0.5, y - h / 2 + 0.5, w - 1, h - 1);
+    g.lineStyle(1, 0x1a1009, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(x - w / 2 + 1, y + h / 2 - 2, x + w / 2 - 2, y + h / 2 - 2));
+  }
+
+  _clampTextToBox(textObj, rawText, maxWidth, maxLines) {
+    const src = String(rawText || '');
+    textObj.setWordWrapWidth(maxWidth, true);
+    textObj.setText(src);
+    if (textObj.getWrappedText(src).length <= maxLines) return;
+
+    let lo = 0;
+    let hi = src.length;
+    let best = '…';
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const candidate = `${src.slice(0, mid).trimEnd()}…`;
+      if (textObj.getWrappedText(candidate).length <= maxLines) {
+        best = candidate;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    textObj.setText(best);
   }
 
   _relicDescriptions() {
@@ -510,14 +582,34 @@ class DiggerScene extends Phaser.Scene {
     if (type === 'diamond') return { color: 0x7fb3d1, texture: 'tile_diamond', alpha: 1 };
     if (type === 'event')   return { color: 0xa4572f, texture: 'tile_event',   alpha: 1 };
     if (type === 'puzzle')  return { color: 0xc79532, texture: 'tile_puzzle',  alpha: 1 };
-    if (type === 'empty')   return { color: 0x2d180c, texture: 'tile_empty',   alpha: 0.45 };
+    if (type === 'empty')   return { color: 0x2d180c, texture: 'tile_empty',   alpha: 0.2 };
     return { color: 0x4c2814, texture: 'tile_dirt', alpha: 1 };
+  }
+
+  _applyTileTexture(sprite, texture, mode = 'repeat') {
+    sprite.setTexture(texture);
+    if (mode === 'cover') {
+      const frame = this.textures.get(texture)?.get();
+      if (frame && frame.width > 0 && frame.height > 0) {
+        const scale = Math.max(sprite.width / frame.width, sprite.height / frame.height);
+        sprite.tileScaleX = scale;
+        sprite.tileScaleY = scale;
+        sprite.tilePositionX = (frame.width * scale - sprite.width) / (2 * scale);
+        sprite.tilePositionY = (frame.height * scale - sprite.height) / (2 * scale);
+        return;
+      }
+    }
+    sprite.tileScaleX = 1;
+    sprite.tileScaleY = 1;
+    sprite.tilePositionX = 0;
+    sprite.tilePositionY = 0;
   }
 
   _renderTiles(col, tiles) {
     for (let i = 0; i < 5; i++) {
       const cfg = this._tileStyle(tiles[i]);
-      col[i].sprite.setTexture(cfg.texture).setAlpha(cfg.alpha);
+      this._applyTileTexture(col[i].sprite, cfg.texture, TILE_FIT_MODE);
+      col[i].sprite.setAlpha(cfg.alpha);
     }
   }
 
@@ -577,10 +669,14 @@ class DiggerScene extends Phaser.Scene {
     if (this.relicText) {
       const relics = this.meta?.unlockedRelics || [];
       const tags = [];
-      if (relics.includes('extra_tool')) tags.push('+');
+      if (relics.includes('extra_tool')) tags.push('＋');
       if (relics.includes('stone_resist')) tags.push('岩');
       if (relics.includes('survey_aura')) tags.push('勘');
-      this.relicText.setText(tags.length ? `遺物 ${tags.join(' ')}` : '遺物 -');
+      if (tags.length) {
+        this.relicText.setText(`遺物 ${tags.join(' ')}`).setVisible(true);
+      } else {
+        this.relicText.setVisible(false);
+      }
     }
   }
 
@@ -599,35 +695,35 @@ class DiggerScene extends Phaser.Scene {
     this.state = state;
 
     // ── HUD
-    this.depthText.setText(`深度: ${state.depth}`);
-    this.toolsText.setText(`工具: ${state.tools}`);
-    this.bestText.setText( `最佳: ${state.bestDepth}`);
-    this.scoreText.setText(state.score > 0 ? `分 ${state.score}` : '');
+    this.depthText.setText(`深度 ${state.depth}`);
+    this.toolsText.setText(`工具 ${state.tools}`);
+    this.bestText.setText( `最佳 ${state.bestDepth}`);
+    this.scoreText.setText(`分 ${state.score}`);
     if (this.pauseBtn) this.pauseBtn.setText(state.paused ? '繼續' : '暫停');
 
     const streak = state.safeStreak || 0;
     if (streak >= 5) {
       const tier = streak >= 20 ? '極速' : streak >= 10 ? '高速' : '穩定';
-      this.streakText.setText(`${tier} 連挖 x${streak}`);
+      this.streakText.setText(`${tier} ×${streak}`).setColor('#f6cf4a');
     } else {
       this.streakText.setText('');
     }
 
-    if (!state.alive)        this.statusText.setText('工具壞掉了');
-    else if (state.paused)   this.statusText.setText('⏸ 已暫停');
-    else if (state.inEvent)  this.statusText.setText(this.eventMode === 'roulette' ? '轉盤旋轉中…' : '事件中，按 1/2/3 選擇');
-    else if (state.autoDigActive) this.statusText.setText(`自動挖掘（${state.autoDigSide === 'left' ? '左' : '右'}）`);
-    else                     this.statusText.setText('');
+    if (!state.alive)             this.statusText.setText('工具壞掉了 ☠');
+    else if (state.paused)        this.statusText.setText('⏸ 已暫停');
+    else if (state.inEvent)       this.statusText.setText(this.eventMode === 'roulette' ? '● 轉盤旋轉中…' : '▶ 事件中');
+    else if (state.autoDigActive) this.statusText.setText(`⚡ 自動（${state.autoDigSide === 'left' ? '左' : '右'}）`);
+    else                          this.statusText.setText('');
 
     const maxTools = state.maxTools || state.tools || 1;
     const toolRatio = Math.max(0, Math.min(1, state.tools / maxTools));
-    this.toolMeterFill.width = 90 * toolRatio;
+    this.toolMeterFill.width = 118 * toolRatio;
     if (toolRatio > 0.6) this.toolMeterFill.setFillStyle(0x52d48a);
     else if (toolRatio > 0.3) this.toolMeterFill.setFillStyle(0xf6cf4a);
     else this.toolMeterFill.setFillStyle(0xe05050);
 
-    if (state.goldPlatingActive) this.toolsText.setStyle({ backgroundColor: '#7a6400aa', color: '#fff4b0' });
-    else this.toolsText.setStyle({ backgroundColor: '#00000044', color: '#f8f3e6' });
+    if (state.goldPlatingActive) this.toolsText.setStyle({ color: '#fff4b0' });
+    else this.toolsText.setStyle({ color: '#f8f3e6' });
 
     // ── Tiles
     this._renderTiles(this.leftTiles,  state.previews.left);
@@ -710,33 +806,57 @@ class DiggerScene extends Phaser.Scene {
     this.modalLayer.removeAll(true);
 
     const panelW = WIDTH - 40;
-    const panelH = 300;
     const panelX = WIDTH / 2;
     const panelY = HEIGHT / 2;
+    const topPad = 20;
+    const sidePad = 20;
+    const headGap = 10;
 
-    const bg = this._makePanel(panelX, panelY, panelW, panelH);
-    const title = this.add.text(panelX, panelY - 120, eventData.title || '地底事件', { fontFamily: FONT_FAMILY, fontSize: '24px', color: '#ffe58a' }).setOrigin(0.5, 0);
-    const desc = this.add.text(panelX, panelY - 84, eventData.desc || '', {
-      fontFamily: FONT_FAMILY, fontSize: '15px', color: '#f8f3e6', wordWrap: { width: panelW - 40 }
-    }).setOrigin(0.5, 0);
-    this.modalLayer.add([bg, title, desc]);
+    const title = this.add.text(0, 0, eventData.title || '地底事件', {
+      fontFamily: PIXEL_FONT, fontSize: '24px', color: '#ffe58a'
+    }).setOrigin(0.5, 0).setVisible(false);
+    const desc = this.add.text(0, 0, eventData.desc || '', {
+      fontFamily: PIXEL_FONT, fontSize: '14px', color: '#f8f3e6',
+      wordWrap: { width: panelW - sidePad * 2 }
+    }).setOrigin(0.5, 0).setVisible(false);
+    this._clampTextToBox(desc, eventData.desc || '', panelW - sidePad * 2, 3);
+
+    const headerH = title.height + 8 + desc.height;
+    const bodyTop = topPad + headerH + headGap;
+    let panelH = 300;
 
     if (this.eventMode === 'roulette') {
       const cards = [];
       const cardW = panelW - 70;
-      const startY = panelY - 24;
+      const cardH = 56;
+      const rowGap = 10;
+      const bodyH = this.eventOptions.length * cardH + Math.max(0, this.eventOptions.length - 1) * rowGap;
+      const hintH = 18;
+      panelH = Math.max(300, bodyTop + bodyH + 10 + hintH + 18);
+
+      const bg = this._makePanel(panelX, panelY, panelW, panelH);
+      title.setPosition(panelX, panelY - panelH / 2 + topPad).setVisible(true);
+      desc.setPosition(panelX, title.y + title.height + 8).setVisible(true);
+      this.modalLayer.add([bg, title, desc]);
+
+      const cardsTop = desc.y + desc.height + headGap;
       for (let i = 0; i < this.eventOptions.length; i++) {
         const opt = this.eventOptions[i];
-        const y = startY + i * 62;
-        const card = this.add.rectangle(panelX, y + 18, cardW, 52, 0x3a2510).setStrokeStyle(2, 0x7a5a2a);
-        const label = this.add.text(panelX, y + 4, `${opt.title} - ${opt.desc}`, {
-          fontFamily: FONT_FAMILY, fontSize: '14px', color: '#f8f3e6', wordWrap: { width: cardW - 22 }, align: 'center'
-        }).setOrigin(0.5, 0);
+        const y = cardsTop + i * (cardH + rowGap) + cardH / 2;
+        const card = this.add.rectangle(panelX, y, cardW, cardH, 0x3a2510).setStrokeStyle(2, 0x7a5a2a);
+        const label = this.add.text(panelX, y, `${opt.title} - ${opt.desc}`, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '14px',
+          color: '#f8f3e6',
+          wordWrap: { width: cardW - 22 },
+          align: 'center'
+        }).setOrigin(0.5);
+        this._clampTextToBox(label, `${opt.title} - ${opt.desc}`, cardW - 22, 2);
         cards.push({ card, label });
         this.modalLayer.add([card, label]);
       }
-      const hint = this.add.text(panelX, panelY + 108, '轉盤旋轉中…', {
-        fontFamily: FONT_FAMILY, fontSize: '13px', color: '#a09070'
+      const hint = this.add.text(panelX, cardsTop + bodyH + 10, '轉盤旋轉中…', {
+        fontFamily: PIXEL_FONT, fontSize: '12px', color: '#a09070'
       }).setOrigin(0.5, 0);
       this.modalLayer.add(hint);
 
@@ -782,24 +902,49 @@ class DiggerScene extends Phaser.Scene {
     }
 
     const numCards = Math.min(this.eventOptions.length, 3);
-    const cW = 126, cH = 128, cGap = 8;
+    // Cards: taller, slightly narrower gap to fit 3 comfortably
+    const cW = 130, cH = 148, cGap = 6;
+    panelH = Math.max(330, bodyTop + cH + 24);
+    const bg = this._makePanel(panelX, panelY, panelW, panelH);
+    title.setPosition(panelX, panelY - panelH / 2 + topPad).setVisible(true);
+    desc.setPosition(panelX, title.y + title.height + 8).setVisible(true);
+    this.modalLayer.add([bg, title, desc]);
+
     const totalCW = numCards * cW + (numCards - 1) * cGap;
     const c0X = panelX - totalCW / 2 + cW / 2;
-    const cY = panelY + 26;
+    const cY = desc.y + desc.height + headGap + cH / 2;
+    const numLabels = ['①', '②', '③'];
     for (let i = 0; i < numCards; i++) {
       const opt = this.eventOptions[i];
       const cx = c0X + i * (cW + cGap);
       const cg = this.add.graphics();
       this._drawCard(cg, cx, cY, cW, cH, false);
       const hz = this.add.rectangle(cx, cY, cW, cH, 0x000000, 0).setInteractive({ useHandCursor: true });
-      const numT = this.add.text(cx, cY - 54, `${i + 1}`, { fontFamily: FONT_FAMILY, fontSize: '12px', color: '#706050' }).setOrigin(0.5);
-      const ttl = this.add.text(cx, cY - 38, opt.title, { fontFamily: FONT_FAMILY, fontSize: '15px', color: '#ffe58a', align: 'center', wordWrap: { width: cW - 14 } }).setOrigin(0.5, 0);
-      const dsc = this.add.text(cx, cY + 8, opt.desc, { fontFamily: FONT_FAMILY, fontSize: '11px', color: '#c8b87e', align: 'center', wordWrap: { width: cW - 14 } }).setOrigin(0.5, 0);
+      // Option number badge
+      const numT = this.add.text(cx, cY - cH / 2 + 8, numLabels[i], {
+        fontFamily: PIXEL_FONT, fontSize: '14px', color: '#8a7050'
+      }).setOrigin(0.5, 0);
+      // Title — centred, wraps
+      const ttl = this.add.text(cx, cY - cH / 2 + 28, opt.title, {
+        fontFamily: PIXEL_FONT, fontSize: '14px', color: '#ffe58a',
+        align: 'center', wordWrap: { width: cW - 16 }
+      }).setOrigin(0.5, 0);
+      this._clampTextToBox(ttl, opt.title, cW - 16, 2);
+      // Divider line
+      const div = this.add.graphics();
+      div.lineStyle(1, 0x6a4820, 0.7);
+      div.strokeLineShape(new Phaser.Geom.Line(cx - cW / 2 + 12, cY - 10, cx + cW / 2 - 12, cY - 10));
+      // Description
+      const dsc = this.add.text(cx, cY - 6, opt.desc, {
+        fontFamily: PIXEL_FONT, fontSize: '11px', color: '#b8a478',
+        align: 'center', wordWrap: { width: cW - 16 }
+      }).setOrigin(0.5, 0);
+      this._clampTextToBox(dsc, opt.desc, cW - 16, 4);
       const ii = i;
-      hz.on('pointerover', () => { this._drawCard(cg, cx, cY, cW, cH, true); ttl.setColor('#ffffff'); });
-      hz.on('pointerout',  () => { this._drawCard(cg, cx, cY, cW, cH, false); ttl.setColor('#ffe58a'); });
+      hz.on('pointerover', () => { this._drawCard(cg, cx, cY, cW, cH, true); ttl.setColor('#ffffff'); numT.setColor('#f6cf4a'); });
+      hz.on('pointerout',  () => { this._drawCard(cg, cx, cY, cW, cH, false); ttl.setColor('#ffe58a'); numT.setColor('#8a7050'); });
       hz.on('pointerdown', () => this._handleEventChoice(ii));
-      this.modalLayer.add([cg, hz, numT, ttl, dsc]);
+      this.modalLayer.add([cg, hz, numT, ttl, div, dsc]);
     }
   }
 
@@ -905,8 +1050,8 @@ class DiggerScene extends Phaser.Scene {
     const panelY = HEIGHT / 2 - 60;
 
     const bg    = this._makePanel(panelX, panelY, panelW, 260);
-    const title = this.add.text(panelX, panelY - 110, '選擇難度', { fontFamily: FONT_FAMILY, fontSize: '26px', color: '#ffe58a' }).setOrigin(0.5, 0);
-    const sub   = this.add.text(panelX, panelY - 76, '難度會影響初始耐久與危險格機率', { fontFamily: FONT_FAMILY, fontSize: '13px', color: '#a09070' }).setOrigin(0.5, 0);
+    const title = this.add.text(panelX, panelY - 110, '選擇難度', { fontFamily: PIXEL_FONT, fontSize: '26px', color: '#ffe58a' }).setOrigin(0.5, 0);
+    const sub   = this.add.text(panelX, panelY - 76, '難度會影響初始耐久與危險格機率', { fontFamily: PIXEL_FONT, fontSize: '12px', color: '#a09070' }).setOrigin(0.5, 0);
     this.modalLayer.add([bg, title, sub]);
 
     const diffs = [
@@ -926,12 +1071,13 @@ class DiggerScene extends Phaser.Scene {
       this._drawCard(cardG, x, cardY, cardW, cardH, false);
       const hitZone = this.add.rectangle(x, cardY, cardW, cardH, 0x000000, 0).setInteractive({ useHandCursor: true });
       const label = this.add.text(x, cardY - 28, d.label, {
-        fontFamily: FONT_FAMILY, fontSize: '22px', color: '#f8f3e6', align: 'center'
+        fontFamily: PIXEL_FONT, fontSize: '21px', color: '#f8f3e6', align: 'center'
       }).setOrigin(0.5);
       const subLabel = this.add.text(x, cardY + 20, d.sub, {
-        fontFamily: FONT_FAMILY, fontSize: '13px', color: '#c8b87e', align: 'center',
+        fontFamily: PIXEL_FONT, fontSize: '12px', color: '#c8b87e', align: 'center',
         wordWrap: { width: cardW - 16 }
       }).setOrigin(0.5);
+      this._clampTextToBox(subLabel, d.sub, cardW - 16, 3);
       hitZone.on('pointerover', () => { this._drawCard(cardG, x, cardY, cardW, cardH, true); label.setColor('#ffe58a'); });
       hitZone.on('pointerout',  () => { this._drawCard(cardG, x, cardY, cardW, cardH, false); label.setColor('#f8f3e6'); });
       hitZone.on('pointerdown', () => { this.uiModalOpen = false; this.modalLayer.removeAll(true); onSelect(d.key); });
@@ -947,6 +1093,6 @@ new Phaser.Game({
   parent: 'app',
   backgroundColor: '#2b1b11',
   scene: [DiggerScene],
-  render: { antialias: false, pixelArt: true, roundPixels: true },
+  render: { antialias: true, pixelArt: false, roundPixels: true },
   scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
 });

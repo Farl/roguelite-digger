@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>UI Brainstorm – 挖地瓜</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0906; color: #f8f3e6; font-family: 'PingFang TC', sans-serif; padding: 24px; }
+  h1 { color: #ffe58a; font-size: 20px; margin-bottom: 8px; }
+  h2 { color: #f6cf4a; font-size: 14px; margin: 20px 0 8px; letter-spacing: 1px; text-transform: uppercase; }
+  p  { color: #a09070; font-size: 12px; margin-bottom: 4px; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 32px; }
+  .card { background: #1a1009; border: 1px solid #3a2510; border-radius: 8px; padding: 16px; min-width: 200px; }
+  .label { font-size: 11px; color: #7a6a4a; margin-bottom: 8px; }
+
+  /* ── OPTION A: Procedural (current) */
+  .panel-proc {
+    width: 280px; height: 160px;
+    background: #130b04;
+    border: 3px solid #b8851a;
+    border-radius: 12px;
+    outline: 1px solid rgba(246,207,74,0.35);
+    outline-offset: -7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px;
+  }
+
+  /* ── OPTION B: Codex image as 9-slice texture */
+  .panel-codex {
+    width: 280px; height: 160px;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='80' height='80' rx='12' fill='%23120a03'/%3E%3Crect x='2' y='2' width='76' height='76' rx='10' fill='none' stroke='%23c8821a' stroke-width='3'/%3E%3Crect x='6' y='6' width='68' height='68' rx='7' fill='none' stroke='%23f6cf4a' stroke-width='1' stroke-dasharray='2 4' opacity='0.4'/%3E%3Cellipse cx='40' cy='40' rx='22' ry='14' fill='%23200f03' opacity='0.6'/%3E%3C/svg%3E")
+      center/cover;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.5);
+  }
+
+  /* ── OPTION C: Full painted image (PNG panel art) */
+  .panel-painted {
+    width: 280px; height: 160px;
+    background: linear-gradient(160deg, #2a1505 0%, #120802 60%, #1e0f04 100%);
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px;
+    box-shadow: 0 0 0 2px #9a6a12, 0 0 0 4px #3a2010, inset 0 1px 0 rgba(255,220,80,0.15);
+  }
+
+  /* ── BUTTON STYLES */
+  .btn-current {
+    padding: 6px 14px; font-size: 12px; color: #d8c49a;
+    background: rgba(28,16,8,0.8); border: 1.5px solid #5a4020;
+    border-radius: 5px; cursor: pointer;
+  }
+  .btn-codex-icon {
+    padding: 6px 12px; font-size: 12px; color: #f8f3e6;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='28'%3E%3Crect width='40' height='28' rx='5' fill='%231c1008'/%3E%3Crect x='1' y='1' width='38' height='26' rx='4' fill='none' stroke='%238a6030' stroke-width='1.5'/%3E%3C/svg%3E") center/100% 100%;
+    border: none; border-radius: 5px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  .btn-icon-label {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 10px; font-size: 10px; color: #c8b87e;
+    background: #1c1008; border: 1.5px solid #5a4020;
+    border-radius: 8px; cursor: pointer; min-width: 52px; gap: 3px;
+  }
+  .btn-icon-label span { font-size: 18px; }
+
+  /* ── TILE STYLES */
+  .tile-row { display: flex; gap: 2px; }
+  .tile-current {
+    width: 80px; height: 80px; background: #2a1808;
+    border: 2px solid #4c2814; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+  }
+  .tile-fullbleed {
+    width: 82px; height: 82px;
+    background: linear-gradient(135deg, #3a2010 0%, #1e0e06 50%, #2e1a0a 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+    position: relative; overflow: hidden;
+  }
+  .tile-fullbleed::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,180,50,0.06) 0%, transparent 40%);
+  }
+  .tile-fullbleed-codex {
+    width: 82px; height: 82px;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.08) 0px, transparent 2px, transparent 12px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0px, transparent 2px, transparent 12px),
+      linear-gradient(135deg, #4a2c12 0%, #2a1608 60%, #3a2010 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+    position: relative;
+  }
+
+  .sep { border: none; border-top: 1px solid #3a2510; margin: 16px 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; margin-left: 8px; }
+  .tag-now { background: #3a2510; color: #c8b87e; }
+  .tag-codex { background: #1a3020; color: #60c870; }
+  .tag-q { background: #1a2030; color: #6090c8; }
+</style>
+</head>
+<body>
+
+<h1>挖地瓜 UI 設計方向討論</h1>
+<p>這是 brainstorming 用的視覺比對頁面，用來幫助釐清各元素的設計決策。</p>
+
+<hr class="sep">
+
+<!-- ── SECTION 1: MODAL PANEL ── -->
+<h2>1. Modal 面板背景</h2>
+<p>三種方向，討論用哪種（或混用）</p>
+<div class="row">
+
+  <div class="card">
+    <div class="label">A. 程序生成（目前）<span class="tag tag-now">現況</span></div>
+    <div class="panel-proc">
+      <span style="color:#ffe58a;font-size:20px">選擇難度</span>
+      <span style="color:#a09070;font-size:12px">程序畫的圓角框</span>
+    </div>
+    <hr class="sep">
+    <p>✓ 零資源依賴，執行期生成</p>
+    <p>✗ 看起來像 debug UI，沒有遊戲質感</p>
+  </div>
+
+  <div class="card">
+    <div class="label">B. Codex 生成 PNG → 9-slice<span class="tag tag-codex">推薦</span></div>
+    <div class="panel-codex">
+      <span style="color:#ffe58a;font-size:20px">選擇難度</span>
+      <span style="color:#a09070;font-size:12px">石板/木框質感</span>
+    </div>
+    <hr class="sep">
+    <p>✓ 真實石板 / 木框紋理，商業品質</p>
+    <p>✓ 9-slice 可自由縮放尺寸</p>
+    <p>✗ 需要生成 80×80px panel 圖（含角落紋理）</p>
+  </div>
+
+  <div class="card">
+    <div class="label">C. 全畫幅 PNG（不縮放）<span class="tag tag-q">待確認</span></div>
+    <div class="panel-painted">
+      <span style="color:#ffe58a;font-size:20px">選擇難度</span>
+      <span style="color:#a09070;font-size:12px">每個 modal 固定尺寸圖</span>
+    </div>
+    <hr class="sep">
+    <p>✓ 最高品質，可畫複雜背景</p>
+    <p>✗ 每種 modal 需獨立圖，難以複用</p>
+    <p>✗ 尺寸固定，難以適應內容長度</p>
+  </div>
+
+</div>
+
+<hr class="sep">
+
+<!-- ── SECTION 2: BUTTONS ── -->
+<h2>2. 底部按鈕</h2>
+<p>六顆按鈕（暫停 / 音開 / 說明 / 收藏 / 重開 / 清進度）的呈現方式</p>
+<div class="row">
+
+  <div class="card">
+    <div class="label">A. 目前（文字+半透明背景）<span class="tag tag-now">現況</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn-current">暫停</button>
+      <button class="btn-current">音開</button>
+      <button class="btn-current">說明</button>
+      <button class="btn-current">收藏</button>
+      <button class="btn-current">重開</button>
+      <button class="btn-current">清進度</button>
+    </div>
+    <hr class="sep">
+    <p>✗ 看起來像 debug 工具列，不像遊戲 UI</p>
+  </div>
+
+  <div class="card">
+    <div class="label">B. Codex 生圖按鈕底圖 + 文字<span class="tag tag-codex">推薦</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn-codex-icon">暫停</button>
+      <button class="btn-codex-icon">音開</button>
+      <button class="btn-codex-icon">說明</button>
+      <button class="btn-codex-icon">收藏</button>
+      <button class="btn-codex-icon">重開</button>
+      <button class="btn-codex-icon">清</button>
+    </div>
+    <hr class="sep">
+    <p>✓ 木質/石質按鈕底圖，有遊戲感</p>
+    <p>✓ 9-slice 可縮放，一張底圖全用</p>
+  </div>
+
+  <div class="card">
+    <div class="label">C. 圖示 Icon + 文字標籤<span class="tag tag-q">待確認</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn-icon-label"><span>⏸</span>暫停</button>
+      <button class="btn-icon-label"><span>🔊</span>音效</button>
+      <button class="btn-icon-label"><span>?</span>說明</button>
+      <button class="btn-icon-label"><span>★</span>收藏</button>
+      <button class="btn-icon-label"><span>↺</span>重開</button>
+    </div>
+    <hr class="sep">
+    <p>✓ 辨識度高，直覺</p>
+    <p>✗ 需要每顆 icon 獨立生成</p>
+    <p>✗ 6 顆排一列空間會很擠</p>
+  </div>
+
+</div>
+
+<hr class="sep">
+
+<!-- ── SECTION 3: TILES ── -->
+<h2>3. 地塊 Tile</h2>
+<p>目前已有 tile_dirt/stone/diamond/event/puzzle/empty 六張 PNG</p>
+<div class="row">
+
+  <div class="card">
+    <div class="label">A. 目前（有明顯格線縫隙）<span class="tag tag-now">現況</span></div>
+    <div class="tile-row">
+      <div class="tile-current">🟫</div>
+      <div class="tile-current">🪨</div>
+      <div class="tile-current">💎</div>
+    </div>
+    <hr class="sep">
+    <p>✗ 圖片小、邊框明顯、像馬賽克</p>
+  </div>
+
+  <div class="card">
+    <div class="label">B. 全出血 PNG（圖片填滿格子）<span class="tag tag-codex">現在做法</span></div>
+    <div class="tile-row">
+      <div class="tile-fullbleed">🟫</div>
+      <div class="tile-fullbleed">🪨</div>
+      <div class="tile-fullbleed">💎</div>
+    </div>
+    <hr class="sep">
+    <p>✓ 無縫、填滿格子</p>
+    <p>? 但現有圖片是 pixel art 小圖，放大後是否清晰？</p>
+  </div>
+
+  <div class="card">
+    <div class="label">C. 重新用 Codex 生 64×64 tilesheet<span class="tag tag-codex">推薦</span></div>
+    <div class="tile-row">
+      <div class="tile-fullbleed-codex">🟫</div>
+      <div class="tile-fullbleed-codex">🪨</div>
+      <div class="tile-fullbleed-codex">💎</div>
+    </div>
+    <hr class="sep">
+    <p>✓ 重新設計成全出血 tileset，無縫拼接</p>
+    <p>✓ 和面板、按鈕統一風格（深色洞穴 + 金黃礦石感）</p>
+  </div>
+
+</div>
+
+<hr class="sep">
+
+<!-- ── OPEN QUESTIONS ── -->
+<h2>待釐清的問題</h2>
+<div class="row">
+  <div class="card" style="max-width:100%;width:100%">
+    <p style="color:#f8f3e6;margin-bottom:8px">Q1. Modal 面板：偏向 B（Codex 9-slice）？還是有其他想法？</p>
+    <p style="color:#f8f3e6;margin-bottom:8px">Q2. 底部按鈕：要做成一排 6 顆，還是考慮改成漢堡選單 / 分兩排？</p>
+    <p style="color:#f8f3e6;margin-bottom:8px">Q3. Tile 圖：現有的 pixel art 放大是否可接受，還是要重新生成？</p>
+    <p style="color:#f8f3e6;margin-bottom:8px">Q4. 除了以上三個，還有哪些 UI 元素是你認為「完全不對」的？</p>
+  </div>
+</div>
+
+</body>
+</html>

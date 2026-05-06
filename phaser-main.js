@@ -71,6 +71,20 @@ class DiggerScene extends Phaser.Scene {
   }
 
   preload() {
+    window.dispatchEvent(new CustomEvent('yam:loading-progress', {
+      detail: { text: '載入素材中…', progress: 0.36 }
+    }));
+    this.load.on('progress', progress => {
+      window.dispatchEvent(new CustomEvent('yam:loading-progress', {
+        detail: { text: `載入素材中… ${Math.round(progress * 100)}%`, progress: 0.36 + progress * 0.52 }
+      }));
+    });
+    this.load.once('complete', () => {
+      window.dispatchEvent(new CustomEvent('yam:loading-progress', {
+        detail: { text: '準備地底中…', progress: 0.94 }
+      }));
+    });
+
     this.load.spritesheet('worker', 'assets/sprite-forge/minipack/worker_front_idle_dig.png?v=20260506-v8-128', {
       frameWidth: 128,
       frameHeight: 128
@@ -253,6 +267,9 @@ class DiggerScene extends Phaser.Scene {
 
     // ── Start directly so gameplay visuals are immediately visible.
     this.logic.startRun('normal');
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new CustomEvent('yam:game-ready'));
+    });
   }
 
   // ────────────────────────────────────────────────────────────────

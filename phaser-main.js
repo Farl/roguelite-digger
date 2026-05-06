@@ -1,4 +1,4 @@
-import { Game } from './game.js';
+import { Game, choiceIndexForEventKey } from './game.js?v=20260506-eventkeys';
 import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore, addLeaderboardEntry } from './storage.js';
 
 const Phaser = globalThis.Phaser;
@@ -12,6 +12,7 @@ const MILESTONES = [5, 10, 20, 30, 50, 75, 100, 150, 200];
 const FONT_FAMILY = 'Noto Sans TC, PingFang TC, Microsoft JhengHei, sans-serif';
 const PIXEL_FONT = 'monospace';
 const TILE_FIT_MODE = 'cover';
+const TILE_TYPES_FOR_FX = ['dirt', 'stone', 'diamond', 'event', 'puzzle', 'empty'];
 
 // ─── Web Audio (same synth as DOM version) ───────────────────────
 let _audioCtx = null;
@@ -70,7 +71,14 @@ class DiggerScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('worker', 'assets/ui/gameplay/worker_v2.png');
+    this.load.spritesheet('worker', 'assets/sprite-forge/minipack/worker_front_idle_dig.png?v=20260506-v8-128', {
+      frameWidth: 128,
+      frameHeight: 128
+    });
+    this.load.spritesheet('dig_fx_tiles', 'assets/sprite-forge/minipack/dig_fx_tiles.png?v=20260506-v7', {
+      frameWidth: 64,
+      frameHeight: 64
+    });
     this.load.image('ui_panel', 'assets/ui/ui_panel.png');
     this.load.image('bg_gameplay', 'assets/ui/gameplay/bg_gameplay_raw.png');
     this.load.image('tile_dirt',    'assets/ui/gameplay/tile_dirt_v2.png');
@@ -84,6 +92,7 @@ class DiggerScene extends Phaser.Scene {
   create() {
     _muted = loadMute();
     this.bestScore = loadBestScore();
+    this._applyNearestFilters();
 
     // ── Background
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x130b04);
@@ -133,11 +142,26 @@ class DiggerScene extends Phaser.Scene {
     this.leftTiles  = this._createTileColumn(this.leftColX);
     this.rightTiles = this._createTileColumn(this.rightColX);
 
+    this.anims.create({
+      key: 'worker-idle',
+      frames: this.anims.generateFrameNumbers('worker', { start: 0, end: 3 }),
+      frameRate: 4,
+      repeat: -1
+    });
+    this.anims.create({
+      key: 'worker-dig',
+      frames: this.anims.generateFrameNumbers('worker', { start: 4, end: 7 }),
+      frameRate: 10,
+      repeat: 0
+    });
+    this._createDigFxAnimations();
+
     // ── Worker animation
-    this.worker = this.add.image(this.leftColX - 36, this._workerStandY(), 'worker')
+    this.worker = this.add.sprite(this.leftColX - 36, this._workerStandY(), 'worker', 0)
       .setDisplaySize(96, 96)
       .setOrigin(0.5, 1)
-      .setFlipX(true);
+      .play('worker-idle');
+    this.worker.on('animationcomplete-worker-dig', () => this.worker.play('worker-idle'));
     // ── Input zones
     const leftZone  = this.add.zone(0,        0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
     const rightZone = this.add.zone(WIDTH / 2, 0, WIDTH / 2, HEIGHT).setOrigin(0).setInteractive();
@@ -145,16 +169,18 @@ class DiggerScene extends Phaser.Scene {
     rightZone.on('pointerdown', () => this._dig('right'));
 
     const kb = this.input.keyboard;
-    kb.on('keydown-LEFT',  () => this._dig('left'));
+    kb.on('keydown-LEFT',  () => this._handleDigOrEventKey('ArrowLeft', 'left'));
     kb.on('keydown-A',     () => this._dig('left'));
-    kb.on('keydown-RIGHT', () => this._dig('right'));
+    kb.on('keydown-RIGHT', () => this._handleDigOrEventKey('ArrowRight', 'right'));
     kb.on('keydown-D',     () => this._dig('right'));
+    kb.on('keydown-UP',    () => this._handleEventKey('ArrowUp'));
+    kb.on('keydown-DOWN',  () => this._handleEventKey('ArrowDown'));
     kb.on('keydown-W',     () => this._dig(this.lastManualSide));
     kb.on('keydown-S',     () => this._dig(this.lastManualSide));
     kb.on('keydown-SPACE', () => this._dig(this.lastManualSide));
-    kb.on('keydown-ONE',   () => this._handleEventChoice(0));
-    kb.on('keydown-TWO',   () => this._handleEventChoice(1));
-    kb.on('keydown-THREE', () => this._handleEventChoice(2));
+    kb.on('keydown-ONE',   () => this._handleEventKey('1'));
+    kb.on('keydown-TWO',   () => this._handleEventKey('2'));
+    kb.on('keydown-THREE', () => this._handleEventKey('3'));
     kb.on('keydown-R',     () => { if (this.state && !this.state.alive) this._tryRestartOverlay(); });
     kb.on('keydown-P',     () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
     kb.on('keydown-ESC',   () => { if (this.logic && this.state?.alive && !this.state?.inEvent) this.logic.togglePause(); });
@@ -244,6 +270,34 @@ class DiggerScene extends Phaser.Scene {
     return arr;
   }
 
+  _applyNearestFilters() {
+    const filter = Phaser.Textures.FilterMode.NEAREST;
+    [
+      'worker',
+      'dig_fx_tiles',
+      'tile_dirt',
+      'tile_stone',
+      'tile_diamond',
+      'tile_event',
+      'tile_puzzle',
+      'tile_empty'
+    ].forEach(key => {
+      const tex = this.textures.get(key);
+      if (tex) tex.setFilter(filter);
+    });
+  }
+
+  _createDigFxAnimations() {
+    for (const [row, type] of TILE_TYPES_FOR_FX.entries()) {
+      this.anims.create({
+        key: `dig-fx-${type}`,
+        frames: this.anims.generateFrameNumbers('dig_fx_tiles', { start: row * 4, end: row * 4 + 3 }),
+        frameRate: 14,
+        repeat: 0
+      });
+    }
+  }
+
   _workerStandY() {
     // Feet at top of first tile row; head at gridTop-72 = ~114, just below HUD (ends y=108).
     return this.gridTop;
@@ -261,7 +315,7 @@ class DiggerScene extends Phaser.Scene {
   _placeWorker(side) {
     this.worker.x = side === 'left' ? this.leftColX - 34 : this.rightColX - 34;
     this.worker.y = this._workerStandY();
-    this.worker.setFlipX(side === 'left');
+    this.worker.setFlipX(false);
   }
 
   _dig(side) {
@@ -269,19 +323,52 @@ class DiggerScene extends Phaser.Scene {
     if (this.state.autoDigActive) { this.logic.switchAutoSide(side); this._placeWorker(side); return; }
     this.lastManualSide = side;
     this._placeWorker(side);
+    this._playWorkerDig();
     sfx.dig();
     this.logic.step(side);
   }
 
-  _playDigScroll() {
+  _handleDigOrEventKey(key, side) {
+    if (this.inEvent && this.eventMode === 'choice') {
+      this._handleEventKey(key);
+      return;
+    }
+    this._dig(side);
+  }
+
+  _handleEventKey(key) {
+    const index = choiceIndexForEventKey(key, this.eventOptions.length);
+    if (index == null) return;
+    this._handleEventChoice(index);
+  }
+
+  _playWorkerDig() {
+    if (!this.worker) return;
+    this.worker.play('worker-dig', true);
+  }
+
+  _playDigScroll(side, tileType) {
     const allTiles = [...this.leftTiles, ...this.rightTiles];
     for (const t of allTiles) {
       t.sprite.y = t.baseY + this.tileScrollOffset;
       this.tweens.add({ targets: t.sprite, y: t.baseY, duration: 130, ease: 'Cubic.Out' });
     }
+    this._spawnDigFx(side, tileType);
+    this._playWorkerDig();
     const workerBaseY = this._workerStandY();
     this.worker.y = workerBaseY + 8;
     this.tweens.add({ targets: this.worker, y: workerBaseY, duration: 140, ease: 'Cubic.Out' });
+  }
+
+  _spawnDigFx(side, tileType) {
+    const type = TILE_TYPES_FOR_FX.includes(tileType) ? tileType : 'dirt';
+    const x = side === 'right' ? this.rightColX : this.leftColX;
+    const fx = this.add.sprite(x, this.gridTop + 26, 'dig_fx_tiles', TILE_TYPES_FOR_FX.indexOf(type) * 4)
+      .setDisplaySize(96, 96)
+      .setOrigin(0.5)
+      .setDepth(30)
+      .play(`dig-fx-${type}`);
+    fx.on('animationcomplete', () => fx.destroy());
   }
 
   _withModalPause(fn) {
@@ -564,7 +651,7 @@ class DiggerScene extends Phaser.Scene {
       add('A / ←：挖左側');
       add('D / →：挖右側');
       add('W / S / 空白：沿上次方向挖');
-      add('1 / 2 / 3：事件時選擇選項');
+      add('← / ↑ / → 或 1 / 2 / 3：事件時選擇選項');
       add('P / Esc：暫停 / 繼續');
       add('C：開啟收藏　H：開啟說明', { color: '#c8b87e' });
 
@@ -756,7 +843,9 @@ class DiggerScene extends Phaser.Scene {
     // ── SFX + damage popup on state changes
     if (this.prevState) {
       if (state.depth > (this.prevState.depth || 0)) {
-        this._playDigScroll();
+        const side = this.prevState.lastSide || state.lastSide || this.lastManualSide;
+        const dugTile = this.prevState.previews?.[side]?.[0] || 'dirt';
+        this._playDigScroll(side, dugTile);
       }
       const dmg = this.prevState.tools - state.tools;
       if (dmg > 0) {
@@ -1093,6 +1182,6 @@ new Phaser.Game({
   parent: 'app',
   backgroundColor: '#2b1b11',
   scene: [DiggerScene],
-  render: { antialias: true, pixelArt: false, roundPixels: true },
+  render: { antialias: false, pixelArt: true, roundPixels: true },
   scale:  { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
 });

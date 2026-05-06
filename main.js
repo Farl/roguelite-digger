@@ -1,4 +1,4 @@
-import { Game } from './game.js';
+import { Game, choiceIndexForEventKey } from './game.js?v=20260506-eventkeys';
 import { loadMute, saveMute, loadHintDismissed, saveHintDismissed, loadBestScore, saveBestScore, loadLeaderboard, addLeaderboardEntry } from './storage.js';
 
 const app = document.getElementById('app');
@@ -882,15 +882,10 @@ function showEventModal(eventData, done) {
     });
 
     keyHandler = (e) => {
-      if (e.key === 'ArrowLeft' || e.key === '1') {
+      const index = choiceIndexForEventKey(e.key, cards.length);
+      if (index != null) {
         e.preventDefault();
-        select(0);
-      } else if (e.key === 'ArrowRight' || e.key === '3') {
-        e.preventDefault();
-        select(cards.length - 1);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === '2') {
-        e.preventDefault();
-        if (cards.length >= 2) select(1);
+        select(index);
       }
     };
 

@@ -4,7 +4,8 @@
   "generatedOn": "2026-04-29",
   "targetEngine": "phaser",
   "files": [
-    "worker.png",
+    "worker_front_idle_dig.png",
+    "dig_fx_tiles.png",
     "tile_dirt.png",
     "tile_stone.png",
     "tile_diamond.png",
@@ -13,14 +14,19 @@
     "tile_empty.png"
   ],
   "sources": {
-    "worker": {
-      "rawSheet": "assets/sprite-forge/minipack/build_v5/raw/worker-raw.png",
-      "processedDir": "assets/sprite-forge/minipack/build_v5/worker",
-      "sheet": "2x2",
-      "cellSize": 64,
-      "fitScale": 0.9,
+    "workerFrontIdleDig": {
+      "sheet": "4x2",
+      "cellSize": 128,
+      "fitScale": 0.92,
       "align": "feet",
-      "componentMode": "largest"
+      "componentMode": "all",
+      "revision": "v8 front-facing worker sheet with breathing idle and dig animation; final runtime asset retained, intermediate raw/build outputs cleaned"
+    },
+    "digFxTiles": {
+      "sheet": "4x6",
+      "cellSize": 64,
+      "revision": "per-tile dig effects; final runtime asset retained, intermediate build outputs cleaned",
+      "rows": ["dirt", "stone", "diamond", "event", "puzzle", "empty"]
     },
     "tiles": {
       "rawSheet": "assets/sprite-forge/minipack/build_v5/raw/tiles-raw.png",
@@ -36,14 +42,32 @@
     "sceneFile": "phaser-main.js",
     "worker": {
       "loadedAs": "spritesheet",
-      "frameWidth": 64,
-      "frameHeight": 64,
-      "animation": "worker-walk"
+      "file": "assets/sprite-forge/minipack/worker_front_idle_dig.png",
+      "frameWidth": 128,
+      "frameHeight": 128,
+      "animations": {
+        "worker-idle": "frames 0-3",
+        "worker-dig": "frames 4-7"
+      }
     },
     "tiles": {
       "loadedAs": "images",
       "renderScale": "48x48"
+    },
+    "digFxTiles": {
+      "loadedAs": "spritesheet",
+      "file": "assets/sprite-forge/minipack/dig_fx_tiles.png",
+      "frameWidth": 64,
+      "frameHeight": 64,
+      "animations": {
+        "dig-fx-dirt": "row 0, frames 0-3",
+        "dig-fx-stone": "row 1, frames 4-7",
+        "dig-fx-diamond": "row 2, frames 8-11",
+        "dig-fx-event": "row 3, frames 12-15",
+        "dig-fx-puzzle": "row 4, frames 16-19",
+        "dig-fx-empty": "row 5, frames 20-23"
+      }
     }
   },
-  "notes": "Premium v3 art pass: high-res authored raw sheets postprocessed by generate2dsprite and published to stable Phaser filenames."
+  "notes": "Premium v3 art pass: high-res authored raw sheets postprocessed by generate2dsprite and published to stable Phaser filenames. v6 adds front-facing worker idle/dig sheet generated through imagegen CLI fallback and local chroma-key postprocessing. v7 switches worker idle to a breathing loop, adds per-tile dig FX, and uses nearest filtering in Phaser. v8 rebuilds the worker sheet at 128px per frame from the high-res raw source."
 }

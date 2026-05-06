@@ -757,13 +757,13 @@
       const phaserScript = document.createElement('script');
       phaserScript.src = 'https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js';
       phaserScript.onload = () => {
-        import('./phaser-main.js?v=20260430-modal9slice').catch((err) => {
-          import('./main.js');
+        import('./phaser-main.js?v=20260506-worker128').catch((err) => {
+          import('./main.js?v=20260506-eventkeys');
           console.warn('[engine] phaser module failed, fallback to dom', err);
         });
       };
       phaserScript.onerror = () => {
-        import('./main.js');
+          import('./main.js?v=20260506-eventkeys');
         console.warn('[engine] phaser script failed, fallback to dom');
       };
       document.body.appendChild(phaserScript);

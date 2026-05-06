@@ -13,6 +13,13 @@ const TILE_TYPES = {
 // 例如設為 8，表示 rowDepth 10 出現事件後，rowDepth 11~17 都不會再出現事件格
 const MIN_EVENT_GAP = 8;
 
+export function choiceIndexForEventKey(key, optionCount = 3) {
+  if (key === 'ArrowLeft' || key === '1') return optionCount > 0 ? 0 : null;
+  if (key === 'ArrowUp' || key === 'ArrowDown' || key === '2') return optionCount > 1 ? 1 : null;
+  if (key === 'ArrowRight' || key === '3') return optionCount > 0 ? optionCount - 1 : null;
+  return null;
+}
+
 export class Game {
   constructor(onUpdate, onEvent, onGameOver, onMeta) {
     this.onUpdate = onUpdate;
@@ -564,9 +571,9 @@ export class Game {
   }
 
   applyEvent(option) {
-    option.apply();
     this.inEvent = false;
     this.paused = false;
+    option.apply();
   }
 
   setPaused(paused) {
@@ -649,6 +656,7 @@ export class Game {
       autoDigActive: this.autoDigActive,
       autoDigSide: this.autoDigSide,
       autoDigRemainingMs,
+      lastSide: this.lastSide,
       lastHit: this.lastHit,
       lastPuzzlePiece: this.lastPuzzlePiece,
       goldPlatingActive: this.goldPlatingActive,

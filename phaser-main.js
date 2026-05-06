@@ -171,7 +171,7 @@ class DiggerScene extends Phaser.Scene {
     this._createDigFxAnimations();
 
     // ── Worker animation
-    this.worker = this.add.sprite(this.leftColX - 36, this._workerStandY(), 'worker', 0)
+    this.worker = this.add.sprite(this._workerXForSide('left'), this._workerStandY(), 'worker', 0)
       .setDisplaySize(96, 96)
       .setOrigin(0.5, 1)
       .play('worker-idle');
@@ -319,6 +319,10 @@ class DiggerScene extends Phaser.Scene {
     // Feet at top of first tile row; head at gridTop-72 = ~114, just below HUD (ends y=108).
     return this.gridTop;
   }
+
+  _workerXForSide(side) {
+    return side === 'right' ? this.rightColX : this.leftColX;
+  }
   
   _refreshTileLayout() {
     for (const col of [this.leftTiles, this.rightTiles]) {
@@ -330,7 +334,7 @@ class DiggerScene extends Phaser.Scene {
   }
 
   _placeWorker(side) {
-    this.worker.x = side === 'left' ? this.leftColX - 34 : this.rightColX - 34;
+    this.worker.x = this._workerXForSide(side);
     this.worker.y = this._workerStandY();
     this.worker.setFlipX(false);
   }
@@ -379,7 +383,7 @@ class DiggerScene extends Phaser.Scene {
 
   _spawnDigFx(side, tileType) {
     const type = TILE_TYPES_FOR_FX.includes(tileType) ? tileType : 'dirt';
-    const x = side === 'right' ? this.rightColX : this.leftColX;
+    const x = this._workerXForSide(side);
     const fx = this.add.sprite(x, this.gridTop + 26, 'dig_fx_tiles', TILE_TYPES_FOR_FX.indexOf(type) * 4)
       .setDisplaySize(96, 96)
       .setOrigin(0.5)

@@ -365,7 +365,7 @@ class DiggerScene extends Phaser.Scene {
 
   _playWorkerDig() {
     if (!this.worker) return;
-    this.worker.play('worker-dig', true);
+    this.worker.play('worker-dig');
   }
 
   _playDigScroll(side, tileType) {

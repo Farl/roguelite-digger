@@ -95,12 +95,12 @@ class DiggerScene extends Phaser.Scene {
     });
     this.load.image('ui_panel', 'assets/ui/ui_panel.png');
     this.load.image('bg_gameplay', 'assets/ui/gameplay/bg_gameplay_raw.png');
-    this.load.image('tile_dirt',    'assets/ui/gameplay/tile_dirt_v2.png');
-    this.load.image('tile_stone',   'assets/ui/gameplay/tile_stone_v2.png');
-    this.load.image('tile_diamond', 'assets/ui/gameplay/tile_diamond_v2.png');
-    this.load.image('tile_event',   'assets/ui/gameplay/tile_event_v2.png');
-    this.load.image('tile_puzzle',  'assets/ui/gameplay/tile_puzzle_v2.png');
-    this.load.image('tile_empty',   'assets/ui/gameplay/tile_empty_v2.png');
+    this.load.image('tile_dirt',    'assets/ui/gameplay/tile_dirt_v3.png?v=20260506-yamtiles-v5');
+    this.load.image('tile_stone',   'assets/ui/gameplay/tile_stone_v3.png?v=20260506-yamtiles-v5');
+    this.load.image('tile_diamond', 'assets/ui/gameplay/tile_diamond_v3.png?v=20260506-yamtiles-v5');
+    this.load.image('tile_event',   'assets/ui/gameplay/tile_event_v3.png?v=20260506-yamtiles-v5');
+    this.load.image('tile_puzzle',  'assets/ui/gameplay/tile_puzzle_v3.png?v=20260506-yamtiles-v5');
+    this.load.image('tile_empty',   'assets/ui/gameplay/tile_empty_v3.png?v=20260506-yamtiles-v5');
   }
 
   create() {

@@ -832,7 +832,7 @@
       setLoading('載入 Phaser 引擎中…', 0.18);
       phaserScript.onload = () => {
         setLoading('載入遊戲資源中…', 0.32);
-        import('./phaser-main.js?v=20260506-dig-restart').catch((err) => {
+        import('./phaser-main.js?v=20260506-yamtiles-v5').catch((err) => {
           setLoading('Phaser 載入失敗，切換備用畫面…', 0.72);
           import('./main.js?v=20260506-eventkeys').then(() => requestAnimationFrame(hideLoading));
           console.warn('[engine] phaser module failed, fallback to dom', err);

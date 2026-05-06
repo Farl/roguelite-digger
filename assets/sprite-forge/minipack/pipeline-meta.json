@@ -5,13 +5,7 @@
   "targetEngine": "phaser",
   "files": [
     "worker_front_idle_dig.png",
-    "dig_fx_tiles.png",
-    "tile_dirt.png",
-    "tile_stone.png",
-    "tile_diamond.png",
-    "tile_event.png",
-    "tile_puzzle.png",
-    "tile_empty.png"
+    "dig_fx_tiles.png"
   ],
   "sources": {
     "workerFrontIdleDig": {
@@ -27,15 +21,6 @@
       "cellSize": 64,
       "revision": "per-tile dig effects; final runtime asset retained, intermediate build outputs cleaned",
       "rows": ["dirt", "stone", "diamond", "event", "puzzle", "empty"]
-    },
-    "tiles": {
-      "rawSheet": "assets/sprite-forge/minipack/build_v5/raw/tiles-raw.png",
-      "processedDir": "assets/sprite-forge/minipack/build_v5/tiles",
-      "sheet": "2x3",
-      "cellSize": 96,
-      "fitScale": 0.93,
-      "align": "center",
-      "componentMode": "largest"
     }
   },
   "integration": {
@@ -49,10 +34,6 @@
         "worker-idle": "frames 0-3",
         "worker-dig": "frames 4-7"
       }
-    },
-    "tiles": {
-      "loadedAs": "images",
-      "renderScale": "48x48"
     },
     "digFxTiles": {
       "loadedAs": "spritesheet",
